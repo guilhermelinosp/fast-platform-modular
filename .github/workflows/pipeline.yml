@@ -1,0 +1,33 @@
+name: pipeline
+
+# Fully abstracted: every job is an import from templates.
+# Triggered on push to main (outside .github) so a new release is cut per change.
+# The api runs as a container (buildah → GHCR), so no goreleaser binaries are
+# published — only the release tag + container image:
+#   release (semver tag + GH Release)
+#     → go-quality (tidy/vet/race tests/build/lint/govulncheck; dep-review skips on dispatch)
+#     → image (buildah → GHCR)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '.github/**'
+  workflow_dispatch:
+
+permissions: write-all
+
+jobs:
+  release:
+    uses: guilhermelinosp/templates/.github/workflows/release.yml@main
+    secrets: inherit
+
+  quality:
+    needs: [release]
+    uses: guilhermelinosp/templates/.github/workflows/go-quality.yml@main
+    with:
+      go-version-file: go.mod
+
+  image:
+    needs: [quality]
+    uses: guilhermelinosp/templates/.github/workflows/buildah.yml@main

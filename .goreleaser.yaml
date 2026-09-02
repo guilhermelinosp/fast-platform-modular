@@ -1,0 +1,69 @@
+---
+version: 2
+
+project_name: golang-api-template
+
+before:
+  hooks:
+    - go mod verify
+
+builds:
+  - id: api
+    main: ./cmd/api
+    binary: api
+    env:
+      - CGO_ENABLED=0
+    # Custom flags passed to `go build`. -trimpath belongs here (build flags),
+    # NOT inside -ldflags: the linker rejects it with usage text.
+    # Reference for reproducible builds: docs "Reproducible Builds".
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.FullCommit}}
+      - -X main.date={{.Date}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      # Trim the unsupported corner: windows/arm64 (documented scope).
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  # Releases are created by the reusable org workflow first; GoReleaser
+  # uploads artifacts+checksums onto the SAME existing tag release.
+  draft: false
+  mode: replace-existing
+  header: |
+    ## golang-api-template {{ .Version }}
