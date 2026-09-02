@@ -51,8 +51,8 @@ github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 h1:/Tnpcb2E0Pz/tN9s3bfEY2Q8ePC
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0/go.mod h1:zOBXOsUaBSjKgmH4OGzV1esUpR3oUSCPYVd2cUBjKYY=
 github.com/guilhermelinosp/hellnet-lib-environments v1.1.19 h1:mEoZF5+O9sWkg3IQJhFp8oC2VzWwHGOoJFpsNkFBaLA=
 github.com/guilhermelinosp/hellnet-lib-environments v1.1.19/go.mod h1:YGgbMAqQ5p1xLZqjALSISitFyS4oT8QHGs1JyVkiuQ8=
-github.com/guilhermelinosp/hellnet-lib-telemetry v1.4.0 h1:+FtmdixrQL341Bihwe9QOQdTroOrIp+BwvLyf/C9FD4=
-github.com/guilhermelinosp/hellnet-lib-telemetry v1.4.0/go.mod h1:tWt7/975t2H/BlVqNEVt0nnUvcq0zYVoqXobJKa9iOk=
+github.com/guilhermelinosp/hellnet-lib-telemetry v1.4.3 h1:uIF7NDGQ2AJfub8sib+zba9d7vP96QB2+vlYcCgWPls=
+github.com/guilhermelinosp/hellnet-lib-telemetry v1.4.3/go.mod h1:tWt7/975t2H/BlVqNEVt0nnUvcq0zYVoqXobJKa9iOk=
 github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
 github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=

@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/gin-gonic/gin v1.12.0
-	github.com/guilhermelinosp/hellnet-lib-telemetry v1.4.0
+	github.com/guilhermelinosp/hellnet-lib-telemetry v1.4.3
 	go.opentelemetry.io/otel v1.46.0
 )
 
