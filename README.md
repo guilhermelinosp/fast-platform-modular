@@ -3,9 +3,9 @@
 > Opinionated, production-ready GitHub template for Go HTTP APIs.
 > Boot with **~70–80% of infrastructure done** — you write business logic.
 
-[![pipeline](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/pipeline.yml/badge.svg)](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/pipeline.yml)
-[![pr-check](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/pr-check.yml/badge.svg)](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/pr-check.yml)
-[![CodeQL](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/codeql.yml/badge.svg)](https://github.com/guilhermelinosp/golang-api-template/actions/workflows/codeql.yml)
+[![pipeline](https://github.com/guilhermelinosp/fast-platform-modular/actions/workflows/pipeline.yml/badge.svg)](https://github.com/guilhermelinosp/fast-platform-modular/actions/workflows/pipeline.yml)
+[![pr-check](https://github.com/guilhermelinosp/fast-platform-modular/actions/workflows/pr-check.yml/badge.svg)](https://github.com/guilhermelinosp/fast-platform-modular/actions/workflows/pr-check.yml)
+[![CodeQL](https://github.com/guilhermelinosp/fast-platform-modular/actions/workflows/codeql.yml/badge.svg)](https://github.com/guilhermelinosp/fast-platform-modular/actions/workflows/codeql.yml)
 
 Three non-negotiable statements about this codebase:
 
@@ -59,10 +59,10 @@ curl -s 'localhost:8080/api/v1/hello?name=you'
 # 4. Write business logic. That's your 20%.
 ```
 
-No collector? The SDK starts **disabled** (`Enabled:false` equivalent) and the
-app still serves all platform endpoints. Drop a `HELLNET_TELEMETRY_ENDPOINT`
-into your `.env` or environment and full logs/metrics/traces switch on — no
-code change required.
+No collector? Local structured logging and Prometheus `/metrics` remain active;
+only remote OTLP export and profiling stay off. Add a
+`HELLNET_TELEMETRY_ENDPOINT` to `.env` or the process environment to enable
+remote logs, metrics, traces, and profiling without changing application code.
 
 ---
 
@@ -106,9 +106,9 @@ Lifecycle:      context ─► config ─► telemetry.New ─► deps ─► se
 
 1. **Swap-proof business code** — services/handlers never import `gin`; they
    see `internal/api.Handler`, `Request`, `Response`, `*Error` only.
-2. **One observability seam** — exactly one file imports
-   `hellnet-lib-telemetry` constructors (`internal/observability/telemetry.go`);
-   upgrading the library can never ripple through your domain.
+2. **Direct telemetry composition** — `cmd/api` initializes and wires
+   `hellnet-lib-telemetry`; domain packages receive only the resulting logger
+   and remain independent from telemetry construction.
 3. **Honest testing** — tests exercise handlers through the abstraction port
    AND through the real Gin adapter, using only `httptest`.
 
@@ -122,7 +122,7 @@ Two strict namespaces, zero overlap:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `APP_NAME` | `golang-api-template` | Service identity; fallback telemetry service name |
+| `APP_NAME` | `golang-api-template` | Service identity exposed by the application |
 | `APP_ENV` | `development` | `production` enables Gin release mode |
 | `APP_PORT` | `8080` | Listen port |
 | `APP_SHUTDOWN_TIMEOUT` | `10s` | Drain budget; keep < k8s `terminationGracePeriodSeconds` |
@@ -130,8 +130,7 @@ Two strict namespaces, zero overlap:
 | `APP_CORS_ALLOWED_ORIGINS` | *(disabled)* | Comma-separated exact origins or `*` |
 
 Build metadata (`version`, `commit`, `date`) arrives via `-ldflags`
-(Makefile/Containerfile/CI), appears at `GET /` and as the OTel
-`service.version` resource attribute.
+(Makefile/Containerfile/CI) and appears at `GET /`.
 
 ### Telemetry — owned by hellnet-lib-telemetry
 
@@ -139,14 +138,12 @@ Documented with the library's own conventions; **never mirrored into `APP_*`**:
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `HELLNET_TELEMETRY_SERVICE` | recommended¹ | Service identifier reported everywhere |
-| `HELLNET_TELEMETRY_ENDPOINT` | for signals² | OTLP base URL incl. port (e.g. `http://alloy.monitoring:4318`) |
-| `HELLNET_TELEMETRY_ENVIRONMENT` | optional | e.g. `Production`; also gates dev `.env` loading |
-| `HELLNET_TELEMETRY_ENABLED` | optional | Template-level explicit override (`true`\|`false`) on lib options |
-| `HELLNET_TELEMETRY_ENV_FILE` | optional | Custom `.env` path consumed by the library loader |
+| `HELLNET_TELEMETRY_SERVICE` | required | Service identifier reported everywhere |
+| `HELLNET_TELEMETRY_ENDPOINT` | required for remote export | OTLP base URL incl. port (e.g. `http://alloy.monitoring:4318`) |
+| `HELLNET_TELEMETRY_ENVIRONMENT` | optional | Deployment environment resource attribute |
 
-¹ falls back to `APP_NAME` so local runs boot without configuration.
-² absence ⇒ disabled mode; presence ⇒ traces+metrics+logs export automatically.
+The library also accepts the legacy `HELLNET_*` names as fallback. With no
+endpoint, OTLP export is disabled while stdout logs and `/metrics` stay active.
 
 Full variable reference: <https://github.com/guilhermelinosp/hellnet-lib-telemetry>
 
@@ -157,10 +154,10 @@ Full variable reference: <https://github.com/guilhermelinosp/hellnet-lib-telemet
 Everything below exists because the library does it natively:
 
 * **Logging** — one structured logger: JSON to stdout *and* OTLP, correlated
-  with `trace_id`. Use it anywhere: `observability.Logger(tel).Info(...)`.
+  with `trace_id`. Inject `tel.Logger` into application dependencies.
   Do **not** add zap/zerolog/logrus.
 * **Metrics** — HTTP instrumentation happens once around the whole router
-  (`observability.RequestTelemetry(tel, handler)`): requests/duration/inflight/
+  (`telemetry.Middleware(tel, handler)`): requests/duration/inflight/
   response+body size/error totals plus runtime (GC, memory, goroutines).
   `GET /metrics` serves Prometheus format from the same registry used for OTLP.
 * **Tracing** — inbound spans extracted by the same middleware. For business
@@ -197,7 +194,6 @@ internal/
 │       ├── handler.go       #   Request port impl, JSON writes, error funnel
 │       └── middleware.go    #   request-id, security headers, CORS, recovery
 ├── config/config.go         # APP_* parsing, timeouts, build metadata
-├── observability/telemetry.go  # SINGLE seam to hellnet-lib-telemetry
 ├── server/server.go         # http.Server + graceful Run(ctx)
 ├── hello/                   # reference module (replace me!)
 │   ├── service.go           #   business rules behind Service interface
@@ -220,8 +216,8 @@ make image               # podman build (works with docker too)
 ./bin/golang-api-template --version-check via curl localhost:8080/
 ```
 
-Tests run fast & deterministic: unit tests initialize telemetry in disabled
-mode (`Init` without endpoint envs) — no OTLP collector is ever needed.
+Tests run fast and deterministically without an OTLP collector: the library
+keeps telemetry local when the endpoint is empty.
 
 ### Testing philosophy
 
@@ -291,7 +287,7 @@ import (
     "context"
     "net/http"
 
-    "github.com/guilhermelinosp/golang-api-template/internal/api"
+    "github.com/guilhermelinosp/fast-platform-modular/internal/api"
 )
 
 type CreateInput struct{ SKU string `json:"sku"` }

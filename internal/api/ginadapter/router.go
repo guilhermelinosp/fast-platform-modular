@@ -16,7 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/api"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
 )
 
 // wildcardPattern matches web-style path parameters like "{name}".

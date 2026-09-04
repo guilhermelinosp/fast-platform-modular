@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/api"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
 )
 
 type pingRequest struct{}

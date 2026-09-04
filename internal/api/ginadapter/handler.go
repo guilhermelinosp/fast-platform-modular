@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/api"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
 )
 
 // defaultBodyLimit caps request bodies when not configured (1 MiB).

@@ -6,7 +6,7 @@
 //
 // Nothing here imports Gin or any other transport package: it depends only
 // on internal/api contracts (and stdlib).
-package hello
+package ride
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/api"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
 )
 
 // maxNameLength bounds user input early (security default).
