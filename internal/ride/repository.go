@@ -1,4 +1,4 @@
 package ride
 
-type Repository interface {
-}
+// Repository defines persistence operations for rides.
+type Repository any

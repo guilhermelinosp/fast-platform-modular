@@ -27,6 +27,8 @@ func NewHandler(service Service) *Handler {
 func (h *Handler) Routes() []api.Route {
 	return []api.Route{
 		{Method: api.MethodPost, Path: "/ride", Handler: api.HandlerFunc(h.greetByQuery)},
+		{Method: api.MethodGet, Path: "/ride/:name", Handler: api.HandlerFunc(h.greetByPath)},
+		{Method: api.MethodPost, Path: "/ride/body", Handler: api.HandlerFunc(h.greetByBody)},
 	}
 }
 
