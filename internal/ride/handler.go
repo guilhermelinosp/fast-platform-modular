@@ -1,17 +1,17 @@
-package hello
+package ride
 
 import (
 	"context"
 	"net/http"
 	"strings"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/api"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
 )
 
 // Handler exposes the greeting endpoints. It implements the transport-neutral
 // api.Handler contract; registering it happens through plain Route values:
 //
-//	for _, r := range handler.Routes() { ... }
+//	for _, r: = range handler.Routes() { ... }
 type Handler struct {
 	service Service
 }
@@ -21,14 +21,14 @@ func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
 
-// Routes declares this module's contribution to /api/v1.
+// Routes declare this module's contribution to /api/v1.
 // Three flavors on purpose — they document every input style a typical
-// endpoint needs: query string, path wildcard and JSON body.
+// endpoint needs: query string, path wildcard, and JSON body.
 func (h *Handler) Routes() []api.Route {
 	return []api.Route{
-		{Method: api.MethodGet, Path: "/hello", Handler: api.HandlerFunc(h.greetByQuery)},
-		{Method: api.MethodGet, Path: "/hello/{name}", Handler: api.HandlerFunc(h.greetByPath)},
-		{Method: api.MethodPost, Path: "/hello", Handler: api.HandlerFunc(h.greetByBody)},
+		{Method: api.MethodPost, Path: "/ride", Handler: api.HandlerFunc(h.greetByQuery)},
+		{Method: api.MethodGet, Path: "/ride/:name", Handler: api.HandlerFunc(h.greetByPath)},
+		{Method: api.MethodPost, Path: "/ride/body", Handler: api.HandlerFunc(h.greetByBody)},
 	}
 }
 

@@ -22,7 +22,6 @@ jobs:
   labeler:
     uses: guilhermelinosp/templates/.github/workflows/labeler.yml@main
 
-  # Single-import Go quality + security gate (see ci-templates/go-quality).
   go-quality:
     uses: guilhermelinosp/templates/.github/workflows/go-quality.yml@main
     with:

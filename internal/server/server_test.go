@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/config"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/config"
 )
 
 func testConfig(t *testing.T, port string) *config.Config {

@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/api"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
 )
 
 // TestRootDeclarations asserts the platform contract: the system endpoints
@@ -18,7 +18,6 @@ func TestPlatformEndpointPaths(t *testing.T) {
 		api.PathLive,
 		api.PathReady,
 		api.PathHealth,
-		api.PathMetrics,
 	}
 	for _, path := range want {
 		if path == "" || path[0] != '/' {

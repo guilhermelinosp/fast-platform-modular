@@ -12,15 +12,16 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/api"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
 )
 
 // wildcardPattern matches web-style path parameters like "{name}".
-var wildcardPattern = regexp.MustCompile(`\{([a-zA-Z0-9_]+)\}`)
+var wildcardPattern = regexp.MustCompile(`\{([a-zA-Z0-9_]+)}`)
 
 // Config carries everything the adapter needs from composition time.
 type Config struct {
@@ -136,8 +137,8 @@ func (r *Router) wrap(handler api.Handler, routeMiddlewares []api.Middleware) gi
 	chain = append(chain, routeMiddlewares...)
 
 	wrapped := handler
-	for i := len(chain) - 1; i >= 0; i-- {
-		wrapped = chain[i](wrapped)
+	for _, c := range slices.Backward(chain) {
+		wrapped = c(wrapped)
 	}
 
 	handlerFunc := func(c *gin.Context) {

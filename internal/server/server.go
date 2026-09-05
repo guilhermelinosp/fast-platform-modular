@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/guilhermelinosp/golang-api-template/internal/config"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/config"
 )
 
 // Server wraps net/http with template defaults (secure timeouts) and an

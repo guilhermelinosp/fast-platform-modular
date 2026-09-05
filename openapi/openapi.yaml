@@ -53,7 +53,7 @@ paths:
           description: Process is alive
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/HealthStatus" }
+              schema: { type: object }
 
   /ready:
     get:
@@ -69,12 +69,12 @@ paths:
           description: Ready to receive traffic
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/HealthStatus" }
+              schema: { type: object }
         "503":
           description: Not ready (one or more checks failing)
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/HealthStatus" }
+              schema: { type: object }
 
   /health:
     get:
@@ -83,74 +83,16 @@ paths:
       description: Implemented by hellnet-lib-telemetry `Health()`.
       operationId: getHealth
       responses:
-        "200": { $ref: "#/components/responses/HealthOK" }
-        "503": { $ref: "#/components/responses/HealthDegraded" }
-
-          description: Prometheus text exposition format
-          content:
-            text/plain:
-              schema: { type: string }
-
-  /api/v1/hello:
-    get:
-      tags: [hello]
-      summary: Greet by query parameter
-      operationId: greetByQuery
-      parameters:
-        - name: name
-          in: query
-          required: false
-          schema: { type: string, maxLength: 64 }
-          example: world
-      responses:
         "200":
-          description: Greeting produced
+          description: Healthy
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Greeting" }
-        "400": { $ref: "#/components/responses/Error" }
-    post:
-      tags: [hello]
-      summary: Greet with a JSON body (strict decoding)
-      description: Unknown fields are rejected as validation errors.
-      operationId: greetByBody
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: "#/components/schemas/GreetInput" }
-            examples:
-              valid:
-                value: { name: ana }
-              unknownField:
-                value: { name: ana, typo: true }
-      responses:
-        "201":
-          description: Greeting created
+              schema: { type: object }
+        "503":
+          description: Degraded or not ready
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/Greeting" }
-        "400": { $ref: "#/components/responses/Error" }
-        "413": { $ref: "#/components/responses/Error" }
-
-  /api/v1/hello/{name}:
-    get:
-      tags: [hello]
-      summary: Greet by path wildcard
-      operationId: greetByPath
-      parameters:
-        - name: name
-          in: path
-          required: true
-          schema: { type: string, maxLength: 64 }
-          example: gin
-      responses:
-        "200":
-          description: Greeting produced
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/Greeting" }
-        "400": { $ref: "#/components/responses/Error" }
+              schema: { type: object }
 
 components:
   schemas:
@@ -165,20 +107,6 @@ components:
       required: [message]
       properties:
         message: { type: string }
-    HealthStatus:
-      type: object
-      required: [status]
-      properties:
-        status: { type: string, enum: [live, ready, not ready, ok, degraded] }
-        checks:
-          type: array
-          items:
-            type: object
-            required: [name, status]
-            properties:
-              name: { type: string }
-              status: { type: string }
-              error: { type: string }
     ErrorEnvelope:
       type: object
       required: [error]
@@ -191,16 +119,6 @@ components:
             message: { type: string }
         requestId: { type: string, description: Echoed X-Request-ID when present }
   responses:
-    HealthOK:
-      description: Healthy
-      content:
-        application/json:
-          schema: { $ref: "#/components/schemas/HealthStatus" }
-    HealthDegraded:
-      description: Degraded or not ready
-      content:
-        application/json:
-          schema: { $ref: "#/components/schemas/HealthStatus" }
     Error:
       description: Platform error envelope
       content:

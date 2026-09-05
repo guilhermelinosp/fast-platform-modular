@@ -3,7 +3,7 @@
 // It intentionally knows nothing about telemetry: OpenTelemetry/OTLP settings
 // belong exclusively to hellnet-lib-telemetry and are read from the
 // HELLNET_TELEMETRY_* environment variables by the library itself
-// (see internal/observability for the single integration point).
+// (the application bootstrap delegates them directly to the telemetry library).
 package config
 
 import (
