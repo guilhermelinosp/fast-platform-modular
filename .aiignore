@@ -1,0 +1,54 @@
+# Secrets and local configuration
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.credentials
+secrets/
+credentials/
+
+# IDE and operating-system state
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Dependencies and generated artifacts
+vendor/
+node_modules/
+.dart_tool/
+build/
+.gradle/
+.terraform/
+.terraform.lock.hcl
+bin/
+dist/
+out/
+tmp/
+target/
+*.cache
+coverage.out
+*.cover
+*.test
+*.prof
+*.log
+*.trace
+*.dump
+
+# Compiled binaries
+/api
+*.app
+*.aar
+*.jar
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Git internals
+.git/
