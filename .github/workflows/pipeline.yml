@@ -35,4 +35,3 @@ jobs:
     uses: guilhermelinosp/templates/.github/workflows/buildah.yml@main
     with:
       version: ${{ needs.release.outputs.version }}
-    secrets: inherit
