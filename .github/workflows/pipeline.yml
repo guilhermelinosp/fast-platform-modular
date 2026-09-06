@@ -29,5 +29,10 @@ jobs:
       go-version-file: go.mod
 
   image:
-    needs: [quality]
+    needs:
+      - release
+      - quality
     uses: guilhermelinosp/templates/.github/workflows/buildah.yml@main
+    with:
+      version: ${{ needs.release.outputs.version }}
+    secrets: inherit
