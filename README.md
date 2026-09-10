@@ -20,17 +20,15 @@ Business logic does not depend on Gin.
 ## What you get for free
 
 | Capability | Where it comes from |
-|---|---|---|
-| HTTP routing, handlers, validation, error envelope | [hellnet-lib-api](https://github.com/guilhermelinosp/hellnet-lib-api) (`api` + `adapter`) |
-| Runtime configuration (`HELLNET_*` envs) | hellnet-lib-api (`config`) |
-| Reusable `http.Server` lifecycle | hellnet-lib-api (`server`) |
+|---|---|
+| HTTP routing, handlers, validation, error envelope | `internal/api` abstraction + Gin adapter |
 | Structured logging (`slog`, JSON, trace-correlated) | [hellnet-lib-telemetry](https://github.com/guilhermelinosp/hellnet-lib-telemetry) |
 | Metrics (`http_requests_total`, `http_request_duration_seconds`, inflight, sizes, errors, runtime) | hellnet-lib-telemetry |
 | Distributed tracing (OTLP via otelhttp) | hellnet-lib-telemetry |
-| `/live` `/ready` `/health` `/metrics` endpoints | hellnet-lib-telemetry + hellnet-lib-api platform routes |
+| `/live` `/ready` `/health` `/metrics` endpoints | hellnet-lib-telemetry |
 | Sensitive-data redaction in logs | hellnet-lib-telemetry (`RedactSensitive`) |
-| Graceful shutdown with correct telemetry flush order | hellnet-lib-api `server` + lib `Shutdown()` |
-| Secure timeouts, request-id, security headers, CORS | hellnet-lib-api adapter |
+| Graceful shutdown with correct telemetry flush order | template bootstrap + lib `Shutdown()` |
+| Secure timeouts, request-id, security headers, CORS | template adapter middlewares |
 | Tests via stdlib only (`testing` + `httptest`) | template suites |
 | CI: test/lint/CodeQL/dependency-review/govulncheck | `.github/workflows` |
 | Release: semver tag → GH release → goreleaser binaries → image | org reusable workflows + GoReleaser |
@@ -74,21 +72,21 @@ remote logs, metrics, traces, and profiling without changing application code.
                          HTTP
                           │
                 ┌─────────▼──────────┐
-                │  http.Server       │            ← hellnet-lib-api/server
-                │  (timeouts, drain) │               Server + Run(ctx)
+                │  http.Server       │            ← internal/server
+                │  (timeouts, drain) │               plain net/http lifecycle
                 └─────────┬──────────┘
                           │
         telemetry.Middleware(hellnet-lib-telemetry)    ← logs+metrics+traces for ALL routes
                           │
                 ┌─────────▼──────────┐
-                │   Gin Adapter      │            ← hellnet-lib-api/adapter
-                │ req-id│sec-headers │               gin-backed api.Router
+                │   Gin Adapter      │            ← internal/api/ginadapter
+                │ req-id│sec-headers │               THE ONLY Gin-aware package
                 │ cors │ recovery    │
                 └─────────┬──────────┘
                           │ implements api.Router
                 ┌─────────▼──────────┐
-                │  API Abstraction   │            ← hellnet-lib-api/api
-                │ Handler/Request/   │               transport-neutral contracts
+                │  API Abstraction   │            ← internal/api
+                │ Handler/Requested/   │               transport-neutral contracts
                 │ Response/errors    │
                 └─────────┬──────────┘
                           ▼
@@ -96,8 +94,8 @@ remote logs, metrics, traces, and profiling without changing application code.
                           ▼
                        Service
                   ┌──────┴──────┐
-             Repository     External API           ← wire tel.HealthRegister /
-                                                  tel.HTTPClient when added
+             RepositoryImp     External API           ← wire tel.HealthRegister /
+                                                 tel.HTTPClient when added
 
 Observability:  API ─► gin middleware ─► hellnet-lib-telemetry ─► Logs │ Metrics │ Traces
 Lifecycle:      context ─► config ─► telemetry.New ─► deps ─► server
@@ -107,7 +105,7 @@ Lifecycle:      context ─► config ─► telemetry.New ─► deps ─► se
 ### Why this layering pays off
 
 1. **Swap-proof business code** — services/handlers never import `gin`; they
-   see `hellnet-lib-api/api.Handler`, `Request`, `Response`, `*Error` only.
+   see `internal/api.Handler`, `Request`, `Response`, `*Error` only.
 2. **Direct telemetry composition** — `cmd/api` initializes and wires
    `hellnet-lib-telemetry`; domain packages receive only the resulting logger
    and remain independent from telemetry construction.
@@ -120,19 +118,16 @@ Lifecycle:      context ─► config ─► telemetry.New ─► deps ─► se
 
 Two strict namespaces, zero overlap:
 
-### Application (`hellnet-lib-api/config` reads these — `HELLNET_*`, fallback `APP_*`)
+### Application (`internal/config` reads these)
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `HELLNET_SERVICE` | **required** | Service identity exposed by the application; `FromEnv` fails if empty |
-| `HELLNET_ENVIRONMENT` | `Development` | Logical environment label; log level is derived from it (`debug` in Development, `info` otherwise) |
-| `HELLNET_PORT` | `8080` | Listen port |
-| `HELLNET_SHUTDOWN_TIMEOUT` | `10s` | Drain budget; keep < k8s `terminationGracePeriodSeconds` |
-| `HELLNET_READ_TIMEOUT` / `HELLNET_WRITE_TIMEOUT` / `HELLNET_IDLE_TIMEOUT` / `HELLNET_READ_HEADER_TIMEOUT` | `15s` / `30s` / `120s` / `10s` | Explicit `http.Server` hardening |
-| `HELLNET_CORS_ALLOWED_ORIGINS` | *(disabled)* | Comma-separated exact origins or `*` |
-| `HELLNET_BODY_LIMIT` / `HELLNET_LOG_FORMAT` / `HELLNET_TRUSTED_PROXIES` | see lib | Additional runtime knobs documented in hellnet-lib-api |
-
-Full variable reference: <https://github.com/guilhermelinosp/hellnet-lib-api>
+| `APP_NAME` | `golang-api-template` | Service identity exposed by the application |
+| `APP_ENV` | `development` | `production` enables Gin release mode |
+| `APP_PORT` | `8080` | Listen port |
+| `APP_SHUTDOWN_TIMEOUT` | `10s` | Drain budget; keep < k8s `terminationGracePeriodSeconds` |
+| `APP_READ_TIMEOUT` / `APP_WRITE_TIMEOUT` / `APP_IDLE_TIMEOUT` / `APP_READ_HEADER_TIMEOUT` | `15s` / `30s` / `120s` / `10s` | Explicit `http.Server` hardening |
+| `APP_CORS_ALLOWED_ORIGINS` | *(disabled)* | Comma-separated exact origins or `*` |
 
 Build metadata (`version`, `commit`, `date`) arrives via `-ldflags`
 (Makefile/Containerfile/CI) and appears at `GET /`.
@@ -170,7 +165,7 @@ Everything below exists because the library does it natively:
 
 ```go
 err := tel.WithSpan("orders.process", func(ctx context.Context) error {
-    return s.repo.Create(ctx, order)
+    return s.repo.Requested(ctx, order)
 })
 ```
 
@@ -186,16 +181,26 @@ err := tel.WithSpan("orders.process", func(ctx context.Context) error {
 ```text
 cmd/api/main.go              # tiny bootstrap: wiring + shutdown order ONLY
 internal/
-└── ride/                    # reference module (replace me!)
-    ├── service.go           #   business rules behind Service interface
-    └── handler.go           #   route declarations + input binding
+├── api/                     # TRANSPORT-NEUTRAL contracts (no gin import)
+│   ├── handler.go           #   Handler interface, Route, methods
+│   ├── request.go           #   Requested port + strict JSON BindInto
+│   ├── response.go          #   Response building blocks
+│   ├── errors.go            #   error taxonomy + MapError (sanitized envelope)
+│   ├── router.go            #   Router interface, Middleware type
+│   └── api.go               #   RegisterPlatform: /, /live, /ready, /health,
+│                            #   /metrics, /api/v1 group mounting
+│   └── ginadapter/          # ← THE ONLY PACKAGE THAT IMPORTS GIN
+│       ├── router.go        #   engine build, {name}→:name translation, groups
+│       ├── handler.go       #   Requested port impl, JSON writes, error funnel
+│       └── middleware.go    #   request-id, security headers, CORS, recovery
+├── config/config.go         # APP_* parsing, timeouts, build metadata
+├── server/server.go         # http.Server + graceful Run(ctx)
+├── hello/                   # reference module (replace me!)
+│   ├── Service.go           #   business rules behind Service interface
+│   └── handler.go           #   route declarations + input binding
 openapi/openapi.yaml         # contract of the REAL endpoints (kept honest)
 Containerfile · Makefile · .goreleaser.yaml · .github/workflows/*
 ```
-
-The transport/abstraction layer (`api`, `adapter`, `config`, `server`) lives in
-[hellnet-lib-api](https://github.com/guilhermelinosp/hellnet-lib-api) — it is
-not duplicated here.
 
 ---
 
@@ -217,11 +222,10 @@ keeps telemetry local when the endpoint is empty.
 ### Testing philosophy
 
 * Abstraction behaviors (`errors` mapping, request/response ports) tested
-  without any framework — the suite comes from hellnet-lib-api.
+  without any framework.
 * Adapter integration behavior (routing, recovery, headers, CORS, 404/405
   envelopes) tested through `httptest` against the real Gin engine.
-* Rendering live-socket graceful drain is covered by hellnet-lib-api
-  `server` tests rather than duplicated here.
+* `internal/server` proves listen/graceful-drain with a live socket.
 
 ---
 
@@ -242,7 +246,7 @@ same PR (keeping docs honest beats generating drift).
 | `codeql` | PR→main | CodeQL security+quality (Go, actions) |
 | `pipeline` | push main | org release (semver tag + GH Release) → go-quality → goreleaser artifacts/checksums upload → container image |
 
-Every job is an import from [ci-templates](https://github.com/guilhermelinosp/ci-templates) — this repository owns zero CI logic, only flow declarations. Reuse the same two files in any Go service.
+Every job is an import from [ci-templates](https://github.com/guilhermelinosp/ci-templates) — this repository owns zero CI logic, only flow declarations. Reuse the same two files in any Go Service.
 
 Releases trigger on tag push (created by the org `release` workflow with
 semver derived from conventional commits). GoReleaser ships archives +
@@ -268,7 +272,7 @@ single static binary. Dev tools are absent from the runtime image by design.
    `go.mod` + imports.
 3. Rename `HELLNET_TELEMETRY_SERVICE` value wherever you configure it
    (`.env.example`, your deployment platform of choice).
-4. Delete `internal/ride/*` (or your domain), its registration lines in `cmd/api/main.go`,
+4. Delete `internal/hello/*`, its registration lines in `cmd/api/main.go`,
    and the `/api/v1` paths in `openapi/openapi.yaml`.
 5. `make test && make run` → green baseline restored.
 6. Build your first domain module following the recipe below.
@@ -283,17 +287,17 @@ import (
     "context"
     "net/http"
 
-    "github.com/guilhermelinosp/hellnet-lib-api/api"
+    "github.com/guilhermelinosp/fast-platform-modular/internal/api"
 )
 
-type CreateInput struct{ SKU string `json:"sku"` }
+type RequestedInput struct{ SKU string `json:"sku"` }
 
-func (h *Handler) create(ctx context.Context, req api.Request) (api.Response, error) {
-    var in CreateInput
+func (h *Handler) request(ctx context.Context, req api.Requested) (api.Response, error) {
+    var in RequestedInput
     if err := req.Bind(&in); err != nil {          // strict JSON → 400/413 handled
         return api.Response{}, err
     }
-    order, err := h.service.Create(ctx, in.SKU)    // pure ctx flow: no gin anywhere
+    order, err := h.Service.Requested(ctx, in.SKU)    // pure ctx flow: no gin anywhere
     if err != nil {
         return api.Response{}, err                 // *api.Error → predictable envelope
     }
@@ -303,8 +307,8 @@ func (h *Handler) create(ctx context.Context, req api.Request) (api.Response, er
 // Route declarations (path wildcards use web syntax):
 func (h *Handler) Routes() []api.Route {
     return []api.Route{
-        {Method: http.MethodPost, Path: "/orders", Handler: api.HandlerFunc(h.create)},
-        {Method: http.MethodGet, Path: "/orders/{id}", Handler: api.HandlerFunc(h.get)},
+        {Method: api.MethodPost, Path: "/orders", Handler: api.HandlerFunc(h.request)},
+        {Method: api.MethodGet, Path: "/orders/{id}", Handler: api.HandlerFunc(h.get)},
     }
 }
 ```

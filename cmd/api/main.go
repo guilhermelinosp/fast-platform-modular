@@ -3,7 +3,7 @@
 // Deliberately tiny: it only wires explicit dependencies in lifecycle order
 // and owns the shutdown sequence. Every real decision lives inside packages:
 //
-//	telemetry → platform (config + adapter + server) → routes → run → shutdown
+//	context → config → telemetry → api adapter → http server → shutdown
 package main
 
 import (
@@ -13,18 +13,15 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/guilhermelinosp/fast-platform-modular/internal/rider"
+	"github.com/guilhermelinosp/hellnet-lib-api/adapter"
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
-	"github.com/guilhermelinosp/hellnet-lib-api/platform"
+	"github.com/guilhermelinosp/hellnet-lib-api/config"
+	"github.com/guilhermelinosp/hellnet-lib-api/server"
+
+	"github.com/guilhermelinosp/hellnet-lib-database/database"
+	"github.com/guilhermelinosp/hellnet-lib-kafka/kafka"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
-
-	"github.com/guilhermelinosp/fast-platform-modular/internal/ride"
-)
-
-// Build metadata injected via -ldflags (see Makefile, Containerfile, CI).
-var (
-	version = "dev"
-	commit  = "unknown"
-	date    = "unknown"
 )
 
 func main() {
@@ -39,43 +36,56 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// 2. Telemetry — the library owns environment loading and its base context.
+	// 2. Configuration (HELLNET_*; telemetry envs stay with the library).
+	cfg, err := config.New()
+	if err != nil {
+		return err
+	}
+
 	tel, err := telemetry.New()
 	if err != nil {
 		return err
 	}
 
-	// 3. Platform — single entry point: config + adapter + server wired once.
-	app, err := platform.New(tel)
+	requested, err := kafka.NewProducer[rider.Requested]()
 	if err != nil {
 		return err
 	}
+	defer func() { _ = requested.Close() }()
 
-	// 4. Business dependencies (composition, no DI framework).
-	helloHandler := ride.NewHandler(ride.NewService(tel.Logger))
+	accepted, err := kafka.NewProducer[rider.Accepted]()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = accepted.Close() }()
 
-	// 5. Register platform + business routes on the wired router.
-	app.Register(api.ServiceInfo{
-		Name:    app.Config.Name,
-		Version: version,
-		Commit:  commit,
-		BuiltAt: date,
-	}, api.Deps{
-		Platform: app.PlatformHandlers(),
-		Routes:   helloHandler.Routes(),
+	db, err := database.New(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+
+	repository := rider.NewDatabase(db)
+
+	producers := rider.NewPublisher(requested, accepted)
+
+	handler := rider.NewHandler(rider.NewService(tel.Logger, repository, producers))
+
+	router := adapter.New(cfg, tel.Logger)
+
+	api.RegisterPlatform(router, api.Deps{
+		Routes: handler.Routes(),
+		Platform: api.PlatformHandlers{
+			Live:   tel.Live(),
+			Ready:  tel.Ready(),
+			Health: tel.Health(),
+		},
 	})
 
-	// 6. Serve until signal, then drain connections gracefully.
-	if err := app.Run(ctx); err != nil {
+	srv := server.New(cfg, tel.Logger, telemetry.Middleware(tel, router))
+	if err := srv.Run(ctx); err != nil {
 		tel.Logger.Error("runtime error", slog.Any("error", err))
-	}
-
-	// 7. Shutdown telemetry last so providers and profiling flush after the
-	// HTTP server has drained in-flight requests.
-	logger := app.Logger
-	logger.Info("shutting down: flushing telemetry")
-	if err := app.Shutdown(); err != nil {
-		logger.Warn("telemetry shutdown reported errors", slog.Any("error", err))
+		return err
 	}
 	return nil
 }

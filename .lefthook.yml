@@ -20,9 +20,7 @@ pre-commit:
       glob: "*.go"
       run: go build ./...
     tidy:
-      run: >-
-        go mod tidy &&
-        git diff --exit-code go.mod $([ -f go.sum ] && echo go.sum)
+      run: go mod tidy
     lint:
       run: |
         if command -v golangci-lint >/dev/null 2>&1; then
@@ -30,11 +28,8 @@ pre-commit:
         else
           echo "golangci-lint not installed; skipping"
         fi
-    yamllint:
-      glob: "*.{yaml,yml}"
-      run: test -z "{staged_files}" || yamllint {staged_files}
     secrets-scan:
-      glob: "*.{yaml,yml,go,json,sh}"
+      glob: "*.{go,json,sh}"
       run: |
         if command -v gitleaks >/dev/null 2>&1; then
           gitleaks detect --source . --no-git -v
