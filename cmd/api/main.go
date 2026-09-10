@@ -42,7 +42,7 @@ func run() error {
 	defer stop()
 
 	// 2. Configuration (HELLNET_*; telemetry envs stay with the library).
-	cfg, err := config.FromEnv(config.Build{Version: version, Commit: commit, Date: date})
+	cfg, err := config.New()
 	if err != nil {
 		return err
 	}
@@ -65,9 +65,9 @@ func run() error {
 	})
 	api.RegisterPlatform(router, api.ServiceInfo{
 		Name:    cfg.Name,
-		Version: cfg.Build.Version,
-		Commit:  cfg.Build.Commit,
-		BuiltAt: cfg.Build.Date,
+		Version: version,
+		Commit:  commit,
+		BuiltAt: date,
 	}, api.Deps{
 		Platform: api.PlatformHandlers{
 			Live:   tel.Live(),

@@ -125,12 +125,12 @@ Two strict namespaces, zero overlap:
 | Variable | Default | Purpose |
 |---|---|---|
 | `HELLNET_SERVICE` | **required** | Service identity exposed by the application; `FromEnv` fails if empty |
-| `HELLNET_ENV` | `Development` | `production` enables Gin release mode |
+| `HELLNET_ENVIRONMENT` | `Development` | Logical environment label; log level is derived from it (`debug` in Development, `info` otherwise) |
 | `HELLNET_PORT` | `8080` | Listen port |
 | `HELLNET_SHUTDOWN_TIMEOUT` | `10s` | Drain budget; keep < k8s `terminationGracePeriodSeconds` |
 | `HELLNET_READ_TIMEOUT` / `HELLNET_WRITE_TIMEOUT` / `HELLNET_IDLE_TIMEOUT` / `HELLNET_READ_HEADER_TIMEOUT` | `15s` / `30s` / `120s` / `10s` | Explicit `http.Server` hardening |
 | `HELLNET_CORS_ALLOWED_ORIGINS` | *(disabled)* | Comma-separated exact origins or `*` |
-| `HELLNET_BODY_LIMIT` / `HELLNET_RELEASE_MODE` / `HELLNET_LOG_LEVEL` / `HELLNET_LOG_FORMAT` / `HELLNET_TRUSTED_PROXIES` | see lib | Additional runtime knobs documented in hellnet-lib-api |
+| `HELLNET_BODY_LIMIT` / `HELLNET_RELEASE_MODE` / `HELLNET_LOG_FORMAT` / `HELLNET_TRUSTED_PROXIES` | see lib | Additional runtime knobs documented in hellnet-lib-api |
 
 Full variable reference: <https://github.com/guilhermelinosp/hellnet-lib-api>
 
