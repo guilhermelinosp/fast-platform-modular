@@ -55,12 +55,7 @@ func run() error {
 	helloHandler := ride.NewHandler(ride.NewService(tel.Logger))
 
 	// 5. Register platform + business routes on the wired router.
-	app.Register(api.ServiceInfo{
-		Name:    app.Config.Name,
-		Version: version,
-		Commit:  commit,
-		BuiltAt: date,
-	}, api.Deps{
+	app.Register(api.Deps{
 		Platform: app.PlatformHandlers(),
 		Routes:   helloHandler.Routes(),
 	})
