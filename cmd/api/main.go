@@ -20,13 +20,6 @@ import (
 	"github.com/guilhermelinosp/fast-platform-modular/internal/ride"
 )
 
-// Build metadata injected via -ldflags (see Makefile, Containerfile, CI).
-var (
-	version = "dev"
-	commit  = "unknown"
-	date    = "unknown"
-)
-
 func main() {
 	if err := run(); err != nil {
 		slog.Error("fatal", slog.Any("error", err))
