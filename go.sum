@@ -53,12 +53,12 @@ github.com/grafana/pyroscope-go/godeltaprof v0.1.11 h1:el5LYpXissAiCKZ5/6yjlr6mh
 github.com/grafana/pyroscope-go/godeltaprof v0.1.11/go.mod h1:jl1V8M4cWsXciROCPIDDG7CtjSjT/ECbp6eLVuMxYRI=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 h1:/Tnpcb2E0Pz/tN9s3bfEY2Q8ePCEX9iuS+cneUwncnw=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0/go.mod h1:zOBXOsUaBSjKgmH4OGzV1esUpR3oUSCPYVd2cUBjKYY=
-github.com/guilhermelinosp/hellnet-lib-api v1.12.0 h1:9Xcr7B4ZmgAWwFWdQD053Se/D6xtNJLKum+U+yO53H8=
-github.com/guilhermelinosp/hellnet-lib-api v1.12.0/go.mod h1:W+8amRC1cWXbcOYoAmg9dKtAFAmAmn2ziCzTtzjDT1w=
+github.com/guilhermelinosp/hellnet-lib-api v1.13.0 h1:KDzuicavYV/MACvOMDmTQe1rj2jhTx/IP7c5DhaIy1Q=
+github.com/guilhermelinosp/hellnet-lib-api v1.13.0/go.mod h1:Z8wfvc6U9pfvifZkz4Ao6zOBvtLz30yEkohmZJw0MYg=
 github.com/guilhermelinosp/hellnet-lib-environments v1.1.22 h1:uEIRgC4Rv6NpoIsT/HydUC+hpC2IOagyJXTilb0eeXI=
 github.com/guilhermelinosp/hellnet-lib-environments v1.1.22/go.mod h1:YGgbMAqQ5p1xLZqjALSISitFyS4oT8QHGs1JyVkiuQ8=
-github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.0 h1:/F5xDxfu3nOXIfmlWVbbnxaFoF170SYNaUHnYXzgMfI=
-github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.0/go.mod h1:7D/k7Im3RqaAUfvOHhxW9HoCJaPki4kA63iG3bNJeNg=
+github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.2 h1:PmSF0eWi22F+nrtjCiKhudxELcUSk201y6azdgVUDy0=
+github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.2/go.mod h1:ydmQmYXANFORliTFswefTXD6E0UARtLCAog5gLfU7Sw=
 github.com/joho/godotenv v1.5.1 h1:7eLL/+HRGLY0ldzfGMeQkb7vMd0as4CfYvUVzLqw0N0=
 github.com/joho/godotenv v1.5.1/go.mod h1:f4LDr5Voq0i2e/R5DDNOoa2zzDfwtkZa6DnEwAbqwq4=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=

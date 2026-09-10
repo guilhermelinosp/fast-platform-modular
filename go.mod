@@ -3,8 +3,8 @@ module github.com/guilhermelinosp/fast-platform-modular
 go 1.27.0
 
 require (
-	github.com/guilhermelinosp/hellnet-lib-api v1.12.0
-	github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.0
+	github.com/guilhermelinosp/hellnet-lib-api v1.13.0
+	github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.2
 )
 
 require (
