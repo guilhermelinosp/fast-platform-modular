@@ -58,11 +58,7 @@ func run() error {
 	helloHandler := ride.NewHandler(ride.NewService(logger))
 
 	// 5. HTTP boundary: Gin adapter + platform + business routes.
-	router := adapter.New(adapter.Config{
-		Config:           *cfg,
-		Logger:           logger,
-		GlobalMiddleware: nil,
-	})
+	router := adapter.New(cfg, logger)
 	api.RegisterPlatform(router, api.ServiceInfo{
 		Name:    cfg.Name,
 		Version: version,

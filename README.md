@@ -130,7 +130,7 @@ Two strict namespaces, zero overlap:
 | `HELLNET_SHUTDOWN_TIMEOUT` | `10s` | Drain budget; keep < k8s `terminationGracePeriodSeconds` |
 | `HELLNET_READ_TIMEOUT` / `HELLNET_WRITE_TIMEOUT` / `HELLNET_IDLE_TIMEOUT` / `HELLNET_READ_HEADER_TIMEOUT` | `15s` / `30s` / `120s` / `10s` | Explicit `http.Server` hardening |
 | `HELLNET_CORS_ALLOWED_ORIGINS` | *(disabled)* | Comma-separated exact origins or `*` |
-| `HELLNET_BODY_LIMIT` / `HELLNET_RELEASE_MODE` / `HELLNET_LOG_FORMAT` / `HELLNET_TRUSTED_PROXIES` | see lib | Additional runtime knobs documented in hellnet-lib-api |
+| `HELLNET_BODY_LIMIT` / `HELLNET_LOG_FORMAT` / `HELLNET_TRUSTED_PROXIES` | see lib | Additional runtime knobs documented in hellnet-lib-api |
 
 Full variable reference: <https://github.com/guilhermelinosp/hellnet-lib-api>
 
