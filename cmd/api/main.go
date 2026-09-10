@@ -42,7 +42,7 @@ func run() error {
 	defer stop()
 
 	// 2. Configuration (HELLNET_*; telemetry envs stay with the library).
-	cfg, err := config.FromEnv(config.Build{Version: version, Commit: commit, Date: date})
+	cfg, err := config.New()
 	if err != nil {
 		return err
 	}
@@ -58,16 +58,12 @@ func run() error {
 	helloHandler := ride.NewHandler(ride.NewService(logger))
 
 	// 5. HTTP boundary: Gin adapter + platform + business routes.
-	router := adapter.New(adapter.Config{
-		Config:           *cfg,
-		Logger:           logger,
-		GlobalMiddleware: nil,
-	})
+	router := adapter.New(cfg, logger)
 	api.RegisterPlatform(router, api.ServiceInfo{
 		Name:    cfg.Name,
-		Version: cfg.Build.Version,
-		Commit:  cfg.Build.Commit,
-		BuiltAt: cfg.Build.Date,
+		Version: version,
+		Commit:  commit,
+		BuiltAt: date,
 	}, api.Deps{
 		Platform: api.PlatformHandlers{
 			Live:   tel.Live(),
