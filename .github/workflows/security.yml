@@ -39,7 +39,7 @@ jobs:
 
       - name: GoSec
         if: hashFiles('go.mod') != ''
-        uses: securego/gosec@4d447d9bf750776ec436724dcaf728e5c629f2f6 # master
+        uses: securego/gosec@4d447d9bf750776ec436724dcaf728e5c629f2f6 # v2.22.8
         with:
           args: >-
             -fmt sarif

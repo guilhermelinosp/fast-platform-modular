@@ -86,7 +86,7 @@ remote logs, metrics, traces, and profiling without changing application code.
                           │ implements api.Router
                 ┌─────────▼──────────┐
                 │  API Abstraction   │            ← internal/api
-                │ Handler/Request/   │               transport-neutral contracts
+                │ Handler/Requested/   │               transport-neutral contracts
                 │ Response/errors    │
                 └─────────┬──────────┘
                           ▼
@@ -94,7 +94,7 @@ remote logs, metrics, traces, and profiling without changing application code.
                           ▼
                        Service
                   ┌──────┴──────┐
-             Repository     External API           ← wire tel.HealthRegister /
+             RepositoryImp     External API           ← wire tel.HealthRegister /
                                                  tel.HTTPClient when added
 
 Observability:  API ─► gin middleware ─► hellnet-lib-telemetry ─► Logs │ Metrics │ Traces
@@ -165,7 +165,7 @@ Everything below exists because the library does it natively:
 
 ```go
 err := tel.WithSpan("orders.process", func(ctx context.Context) error {
-    return s.repo.Create(ctx, order)
+    return s.repo.Requested(ctx, order)
 })
 ```
 
@@ -183,7 +183,7 @@ cmd/api/main.go              # tiny bootstrap: wiring + shutdown order ONLY
 internal/
 ├── api/                     # TRANSPORT-NEUTRAL contracts (no gin import)
 │   ├── handler.go           #   Handler interface, Route, methods
-│   ├── request.go           #   Request port + strict JSON BindInto
+│   ├── request.go           #   Requested port + strict JSON BindInto
 │   ├── response.go          #   Response building blocks
 │   ├── errors.go            #   error taxonomy + MapError (sanitized envelope)
 │   ├── router.go            #   Router interface, Middleware type
@@ -191,12 +191,12 @@ internal/
 │                            #   /metrics, /api/v1 group mounting
 │   └── ginadapter/          # ← THE ONLY PACKAGE THAT IMPORTS GIN
 │       ├── router.go        #   engine build, {name}→:name translation, groups
-│       ├── handler.go       #   Request port impl, JSON writes, error funnel
+│       ├── handler.go       #   Requested port impl, JSON writes, error funnel
 │       └── middleware.go    #   request-id, security headers, CORS, recovery
 ├── config/config.go         # APP_* parsing, timeouts, build metadata
 ├── server/server.go         # http.Server + graceful Run(ctx)
 ├── hello/                   # reference module (replace me!)
-│   ├── service.go           #   business rules behind Service interface
+│   ├── Service.go           #   business rules behind Service interface
 │   └── handler.go           #   route declarations + input binding
 openapi/openapi.yaml         # contract of the REAL endpoints (kept honest)
 Containerfile · Makefile · .goreleaser.yaml · .github/workflows/*
@@ -246,7 +246,7 @@ same PR (keeping docs honest beats generating drift).
 | `codeql` | PR→main | CodeQL security+quality (Go, actions) |
 | `pipeline` | push main | org release (semver tag + GH Release) → go-quality → goreleaser artifacts/checksums upload → container image |
 
-Every job is an import from [ci-templates](https://github.com/guilhermelinosp/ci-templates) — this repository owns zero CI logic, only flow declarations. Reuse the same two files in any Go service.
+Every job is an import from [ci-templates](https://github.com/guilhermelinosp/ci-templates) — this repository owns zero CI logic, only flow declarations. Reuse the same two files in any Go Service.
 
 Releases trigger on tag push (created by the org `release` workflow with
 semver derived from conventional commits). GoReleaser ships archives +
@@ -290,14 +290,14 @@ import (
     "github.com/guilhermelinosp/fast-platform-modular/internal/api"
 )
 
-type CreateInput struct{ SKU string `json:"sku"` }
+type RequestedInput struct{ SKU string `json:"sku"` }
 
-func (h *Handler) create(ctx context.Context, req api.Request) (api.Response, error) {
-    var in CreateInput
+func (h *Handler) request(ctx context.Context, req api.Requested) (api.Response, error) {
+    var in RequestedInput
     if err := req.Bind(&in); err != nil {          // strict JSON → 400/413 handled
         return api.Response{}, err
     }
-    order, err := h.service.Create(ctx, in.SKU)    // pure ctx flow: no gin anywhere
+    order, err := h.Service.Requested(ctx, in.SKU)    // pure ctx flow: no gin anywhere
     if err != nil {
         return api.Response{}, err                 // *api.Error → predictable envelope
     }
@@ -307,7 +307,7 @@ func (h *Handler) create(ctx context.Context, req api.Request) (api.Response, er
 // Route declarations (path wildcards use web syntax):
 func (h *Handler) Routes() []api.Route {
     return []api.Route{
-        {Method: api.MethodPost, Path: "/orders", Handler: api.HandlerFunc(h.create)},
+        {Method: api.MethodPost, Path: "/orders", Handler: api.HandlerFunc(h.request)},
         {Method: api.MethodGet, Path: "/orders/{id}", Handler: api.HandlerFunc(h.get)},
     }
 }
