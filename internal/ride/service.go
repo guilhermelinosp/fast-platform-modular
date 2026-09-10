@@ -5,7 +5,6 @@
 // Replace it with your actual domain; keep the same shape.
 //
 // Nothing here imports Gin or any other transport package: it depends only
-// on internal/api contracts (and stdlib).
 package ride
 
 import (
@@ -14,7 +13,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
+	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
 )
 
 // maxNameLength bounds user input early (security default).
@@ -51,7 +50,7 @@ func NewService(logger *slog.Logger) *BasicService {
 func (s *BasicService) Greet(_ context.Context, name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if len(name) > maxNameLength {
-		return "", api.Validation("name", fmt.Sprintf("must be at most %d characters", maxNameLength))
+		return "", apierrors.Validation("name", fmt.Sprintf("must be at most %d characters", maxNameLength))
 	}
 	s.logger.Debug("greeting generated", slog.String("name", name))
 	return fmt.Sprintf("Hello, %s!", name), nil

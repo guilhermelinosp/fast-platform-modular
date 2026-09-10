@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
+	api "github.com/guilhermelinosp/hellnet-lib-api/api"
 )
 
 // TestRootDeclarations asserts the platform contract: the system endpoints

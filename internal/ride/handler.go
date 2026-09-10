@@ -5,7 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
+	"github.com/guilhermelinosp/hellnet-lib-api/api"
+	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
 )
 
 // Handler exposes the greeting endpoints. It implements the transport-neutral
@@ -26,9 +27,9 @@ func NewHandler(service Service) *Handler {
 // endpoint needs: query string, path wildcard, and JSON body.
 func (h *Handler) Routes() []api.Route {
 	return []api.Route{
-		{Method: api.MethodPost, Path: "/ride", Handler: api.HandlerFunc(h.greetByQuery)},
-		{Method: api.MethodGet, Path: "/ride/:name", Handler: api.HandlerFunc(h.greetByPath)},
-		{Method: api.MethodPost, Path: "/ride/body", Handler: api.HandlerFunc(h.greetByBody)},
+		{Method: http.MethodPost, Path: "/ride", Handler: api.HandlerFunc(h.greetByQuery)},
+		{Method: http.MethodGet, Path: "/ride/:name", Handler: api.HandlerFunc(h.greetByPath)},
+		{Method: http.MethodPost, Path: "/ride/body", Handler: api.HandlerFunc(h.greetByBody)},
 	}
 }
 
@@ -49,7 +50,7 @@ func (h *Handler) greetByQuery(ctx context.Context, req api.Request) (api.Respon
 func (h *Handler) greetByPath(ctx context.Context, req api.Request) (api.Response, error) {
 	name := normalize(req.Param("name"))
 	if name == "" {
-		return api.Response{}, api.Validation("name", "path parameter is required")
+		return api.Response{}, apierrors.Validation("name", "path parameter is required")
 	}
 	msg, err := h.service.Greet(ctx, name)
 	if err != nil {
@@ -71,7 +72,7 @@ func (h *Handler) greetByBody(ctx context.Context, req api.Request) (api.Respons
 	}
 	name := normalize(in.Name)
 	if name == "" {
-		return api.Response{}, api.Validation("name", "is required")
+		return api.Response{}, apierrors.Validation("name", "is required")
 	}
 	msg, err := h.service.Greet(ctx, name)
 	if err != nil {

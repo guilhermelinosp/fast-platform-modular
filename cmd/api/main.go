@@ -13,13 +13,13 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/guilhermelinosp/hellnet-lib-api/adapter"
+	"github.com/guilhermelinosp/hellnet-lib-api/api"
+	"github.com/guilhermelinosp/hellnet-lib-api/config"
+	"github.com/guilhermelinosp/hellnet-lib-api/server"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 
-	"github.com/guilhermelinosp/fast-platform-modular/internal/api"
-	"github.com/guilhermelinosp/fast-platform-modular/internal/api/ginadapter"
-	"github.com/guilhermelinosp/fast-platform-modular/internal/config"
 	"github.com/guilhermelinosp/fast-platform-modular/internal/ride"
-	"github.com/guilhermelinosp/fast-platform-modular/internal/server"
 )
 
 // Build metadata injected via -ldflags (see Makefile, Containerfile, CI).
@@ -41,8 +41,8 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// 2. Configuration (APP_*; telemetry envs stay with the library).
-	cfg, err := config.Load(config.Build{Version: version, Commit: commit, Date: date})
+	// 2. Configuration (HELLNET_*; telemetry envs stay with the library).
+	cfg, err := config.FromEnv(config.Build{Version: version, Commit: commit, Date: date})
 	if err != nil {
 		return err
 	}
@@ -58,11 +58,10 @@ func run() error {
 	helloHandler := ride.NewHandler(ride.NewService(logger))
 
 	// 5. HTTP boundary: Gin adapter + platform + business routes.
-	router := ginadapter.New(ginadapter.Config{
-		Logger:             logger,
-		ReleaseMode:        cfg.IsProduction(),
-		CORSAllowedOrigins: cfg.CORSAllowedOrigins,
-		BodyLimit:          cfg.BodyLimit,
+	router := adapter.New(adapter.Config{
+		Config:           *cfg,
+		Logger:           logger,
+		GlobalMiddleware: nil,
 	})
 	api.RegisterPlatform(router, api.ServiceInfo{
 		Name:    cfg.Name,
