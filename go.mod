@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/google/uuid v1.6.0
 	github.com/guilhermelinosp/hellnet-lib-api v1.14.0
-	github.com/guilhermelinosp/hellnet-lib-database v0.0.0-00010101000000-000000000000
+	github.com/guilhermelinosp/hellnet-lib-database v0.0.0-20260903115351-fd56b1b2febe
 	github.com/guilhermelinosp/hellnet-lib-kafka v1.6.10
 	github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.2
 )
@@ -92,5 +92,3 @@ require (
 	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
-
-replace github.com/guilhermelinosp/hellnet-lib-database => /tmp/hellnet-lib-database
