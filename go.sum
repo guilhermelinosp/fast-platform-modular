@@ -57,8 +57,8 @@ github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 h1:/Tnpcb2E0Pz/tN9s3bfEY2Q8ePC
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0/go.mod h1:zOBXOsUaBSjKgmH4OGzV1esUpR3oUSCPYVd2cUBjKYY=
 github.com/guilhermelinosp/hellnet-lib-api v1.14.0 h1:PI0XkMrCaRXnXx/tKNmw6WoSs12ULZ1veSvuRGXlV7o=
 github.com/guilhermelinosp/hellnet-lib-api v1.14.0/go.mod h1:sr+Wm1bahAKc2lMYnOOjCimJbdO5jegGp6ZKHwDBDS4=
-github.com/guilhermelinosp/hellnet-lib-database v0.0.0-20260903115351-fd56b1b2febe h1:CxIQRDAbz1HzoXCmTXp9F4m00Kl3pi6mR3dXt8Ty260=
-github.com/guilhermelinosp/hellnet-lib-database v0.0.0-20260903115351-fd56b1b2febe/go.mod h1:aJY0a2XmoU6hbkPka3ltGMttzwK4BM5jGWf9YunU+sw=
+github.com/guilhermelinosp/hellnet-lib-database v1.0.2 h1:ut6R3XAqbnT663ntmehpj/GBWMVGoE61u683QTMBtiM=
+github.com/guilhermelinosp/hellnet-lib-database v1.0.2/go.mod h1:ERR7wGuJcK0FWVRXHxYjuk3RwIPIdQ1158pFdh1su1E=
 github.com/guilhermelinosp/hellnet-lib-environments v1.1.22 h1:uEIRgC4Rv6NpoIsT/HydUC+hpC2IOagyJXTilb0eeXI=
 github.com/guilhermelinosp/hellnet-lib-environments v1.1.22/go.mod h1:YGgbMAqQ5p1xLZqjALSISitFyS4oT8QHGs1JyVkiuQ8=
 github.com/guilhermelinosp/hellnet-lib-kafka v1.6.10 h1:pn2I4tgln5UlCj4hrSdVaTAzmvz5f1zMIr40TR54F+A=
