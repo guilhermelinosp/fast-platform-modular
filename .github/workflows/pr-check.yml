@@ -11,18 +11,18 @@ permissions:
 
 jobs:
   lint:
-    uses: guilhermelinosp/templates/.github/workflows/shellcheck.yml@a841c2c75668b256587df5bd436ccc0fb917b6ee
+    uses: guilhermelinosp/templates/.github/workflows/shellcheck.yml@88029054697662ad9b664cb5d47e5547a8d0c4a5
 
   merge-check:
-    uses: guilhermelinosp/templates/.github/workflows/merge-check.yml@dc560afab205e9571647b6757bdf31dedce39092
+    uses: guilhermelinosp/templates/.github/workflows/merge-check.yml@88029054697662ad9b664cb5d47e5547a8d0c4a5
 
   gitleaks:
-    uses: guilhermelinosp/templates/.github/workflows/gitleaks.yml@4e39ed05dca63221222868523e7e76fc02967713
+    uses: guilhermelinosp/templates/.github/workflows/gitleaks.yml@88029054697662ad9b664cb5d47e5547a8d0c4a5
 
   labeler:
-    uses: guilhermelinosp/templates/.github/workflows/labeler.yml@1084fb26f3da3997992b2e8489928396030a5c3e
+    uses: guilhermelinosp/templates/.github/workflows/labeler.yml@88029054697662ad9b664cb5d47e5547a8d0c4a5
 
   go-quality:
-    uses: guilhermelinosp/templates/.github/workflows/go-quality.yml@0d4b6ad86ea628e8cb377380c56fd4ffe4f0b28d
+    uses: guilhermelinosp/templates/.github/workflows/go-quality.yml@941d2ee753db423972617a55dfd98f230b2736f9
     with:
       go-version-file: go.mod
