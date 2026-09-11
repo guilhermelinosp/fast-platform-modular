@@ -5,7 +5,7 @@ go 1.27.0
 require (
 	github.com/google/uuid v1.6.0
 	github.com/guilhermelinosp/hellnet-lib-api v1.14.0
-	github.com/guilhermelinosp/hellnet-lib-database v0.0.0-20260903115351-fd56b1b2febe
+	github.com/guilhermelinosp/hellnet-lib-database v1.0.2
 	github.com/guilhermelinosp/hellnet-lib-kafka v1.6.10
 	github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.2
 )
