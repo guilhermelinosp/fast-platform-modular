@@ -44,3 +44,13 @@ jobs:
     uses: guilhermelinosp/templates/.github/workflows/lib-quality.yml@fde7d4a5a2e7aa5dd42e8812df4783daa39b1543 # main
     with:
       go-version-file: go.mod
+
+  image:
+    name: image
+    needs: [release, quality]
+    permissions:
+      contents: read
+      packages: write
+    uses: guilhermelinosp/templates/.github/workflows/buildah.yml@af2bcbe5d72882b5ab9145a02620d229dd14587f # main
+    with:
+      version: ${{ needs.release.outputs.version }}
