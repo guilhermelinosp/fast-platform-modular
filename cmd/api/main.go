@@ -59,7 +59,7 @@ func run() error {
 	}
 	defer func() { _ = accepted.Close() }()
 
-	db, err := database.New(ctx)
+	db, err := database.New()
 	if err != nil {
 		return err
 	}
