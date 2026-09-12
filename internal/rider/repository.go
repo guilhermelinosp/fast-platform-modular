@@ -73,21 +73,20 @@ func (r *Database) Accepted(ctx context.Context, input AcceptedInput) (Ride, err
 		}
 
 		if _, err := tx.Execute(
-			"INSERT INTO ride_status_history (id, ride_id, sequence, status_id) SELECT $1::uuid, $2::uuid, "+
-				"COALESCE(MAX(sequence), 0) + 1, 3 FROM ride_status_history WHERE ride_id = $2::uuid",
+			"INSERT INTO ride_status_history (id, ride_id, sequence, status_id) SELECT $1::uuid, $2::uuid, COALESCE(MAX(sequence), 0) + 1, 3 FROM ride_status_history WHERE ride_id = $2::uuid",
 			input.StatusHistoryID,
 			input.RideID); err != nil {
 			return err
 		}
 
 		if _, err := tx.Execute(
-			"INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, event_version, payload) VALUES ($1::uuid, "+
-				"'ride', $2::uuid, 'fast-ride-accepted.v1', 1, $3::jsonb)",
+			"INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, event_version, payload) VALUES ($1::uuid, 'ride', $2::uuid, 'fast-ride-accepted.v1', 1, $3::jsonb)",
 			input.OutboxID,
 			input.RideID,
 			input.Payload); err != nil {
 			return err
 		}
+
 		ride = Ride{
 			ID: input.RideID,
 		}

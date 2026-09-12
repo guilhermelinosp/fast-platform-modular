@@ -44,19 +44,43 @@ func (s *Service) Requested(ctx context.Context, input RequestedInput) (RideOutp
 	if strings.TrimSpace(input.ID) == "" || strings.TrimSpace(input.RiderID) == "" {
 		return RideOutput{}, apierrors.Validation("ride", "id and rider_id are required")
 	}
+
 	if input.StatusHistoryID == "" {
 		input.StatusHistoryID = uuid.NewString()
 	}
+
 	if input.OutboxID == "" {
 		input.OutboxID = uuid.NewString()
 	}
-	input.Payload, _ = json.Marshal(Requested{EventID: input.OutboxID, EventVersion: 1, OccurredAt: time.Now().UnixMilli(), RideID: input.ID, RiderID: input.RiderID, PickupLatitude: input.PickupLatitude, PickupLongitude: input.PickupLongitude, DestinationLatitude: input.DestinationLatitude, DestinationLongitude: input.DestinationLongitude})
+
+	input.Payload, _ = json.Marshal(Requested{
+		EventID:      input.OutboxID,
+		EventVersion: 1, OccurredAt: time.Now().UnixMilli(),
+		RideID:               input.ID,
+		RiderID:              input.RiderID,
+		PickupLatitude:       input.PickupLatitude,
+		PickupLongitude:      input.PickupLongitude,
+		DestinationLatitude:  input.DestinationLatitude,
+		DestinationLongitude: input.DestinationLongitude,
+	})
+
 	ride, err := s.repository.Requested(ctx, input)
 	if err != nil {
 		return RideOutput{}, err
 	}
+
 	if s.publisher != nil {
-		if err := s.publisher.Requested(Requested{EventID: input.OutboxID, EventVersion: 1, OccurredAt: time.Now().UnixMilli(), RideID: ride.ID, RiderID: ride.RiderID, PickupLatitude: ride.PickupLatitude, PickupLongitude: ride.PickupLongitude, DestinationLatitude: ride.DestinationLatitude, DestinationLongitude: ride.DestinationLongitude}); err != nil {
+		if err := s.publisher.Requested(Requested{
+			EventID:              input.OutboxID,
+			EventVersion:         1,
+			OccurredAt:           time.Now().UnixMilli(),
+			RideID:               ride.ID,
+			RiderID:              ride.RiderID,
+			PickupLatitude:       ride.PickupLatitude,
+			PickupLongitude:      ride.PickupLongitude,
+			DestinationLatitude:  ride.DestinationLatitude,
+			DestinationLongitude: ride.DestinationLongitude,
+		}); err != nil {
 			return RideOutput{}, fmt.Errorf("publish requested: %w", err)
 		}
 	}
@@ -71,6 +95,7 @@ func (s *Service) Accepted(ctx context.Context, input AcceptedInput) (RideOutput
 	if _, err := uuid.Parse(input.DriverID); err != nil {
 		return RideOutput{}, apierrors.Validation("driver_id", "must be a UUID")
 	}
+
 	input.Payload, _ = json.Marshal(Accepted{
 		EventID:      input.OutboxID,
 		EventVersion: 1,
@@ -78,14 +103,24 @@ func (s *Service) Accepted(ctx context.Context, input AcceptedInput) (RideOutput
 		RideID:       input.RideID,
 		DriverID:     input.DriverID,
 	})
+
 	ride, err := s.repository.Accepted(ctx, input)
+
 	if err != nil {
 		return RideOutput{}, err
 	}
+
 	if s.publisher != nil {
-		if err := s.publisher.Accepted(Accepted{EventID: input.OutboxID, EventVersion: 1, OccurredAt: time.Now().UnixMilli(), RideID: ride.ID, DriverID: input.DriverID}); err != nil {
+		if err := s.publisher.Accepted(Accepted{
+			EventID:      input.OutboxID,
+			EventVersion: 1,
+			OccurredAt:   time.Now().UnixMilli(),
+			RideID:       ride.ID,
+			DriverID:     input.DriverID,
+		}); err != nil {
 			return RideOutput{}, fmt.Errorf("publish accepted: %w", err)
 		}
 	}
+
 	return RideOutput{ID: ride.ID}, nil
 }
