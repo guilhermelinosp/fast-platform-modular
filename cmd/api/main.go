@@ -13,7 +13,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/guilhermelinosp/fast-platform-modular/internal/rider"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/rides"
 	"github.com/guilhermelinosp/hellnet-lib-api/adapter"
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
 	"github.com/guilhermelinosp/hellnet-lib-api/config"
@@ -47,13 +47,13 @@ func run() error {
 		return err
 	}
 
-	requested, err := kafka.NewProducer[rider.Requested]()
+	requested, err := kafka.NewProducer[rides.Requested]()
 	if err != nil {
 		return err
 	}
 	defer func() { _ = requested.Close() }()
 
-	accepted, err := kafka.NewProducer[rider.Accepted]()
+	accepted, err := kafka.NewProducer[rides.Accepted]()
 	if err != nil {
 		return err
 	}
@@ -65,11 +65,11 @@ func run() error {
 	}
 	defer func() { _ = db.Close() }()
 
-	repository := rider.NewDatabase(db)
+	repository := rides.NewDatabase(db)
 
-	producers := rider.NewPublisher(requested, accepted)
+	producers := rides.NewPublisher(requested, accepted)
 
-	handler := rider.NewHandler(rider.NewService(tel.Logger, repository, producers))
+	handler := rides.NewHandler(rides.NewService(tel.Logger, repository, producers))
 
 	router := adapter.New(cfg, tel.Logger)
 

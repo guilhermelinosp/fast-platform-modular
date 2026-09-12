@@ -1,4 +1,4 @@
-package rider
+package rides
 
 import "github.com/guilhermelinosp/hellnet-lib-kafka/kafka"
 

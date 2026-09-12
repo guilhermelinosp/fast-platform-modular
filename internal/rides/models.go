@@ -1,4 +1,4 @@
-package rider
+package rides
 
 // Ride is the persisted ride representation returned by the service.
 type Ride struct {

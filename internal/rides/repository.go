@@ -1,4 +1,4 @@
-package rider
+package rides
 
 import (
 	"context"
