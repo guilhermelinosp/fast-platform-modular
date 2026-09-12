@@ -1,11 +1,12 @@
-package rider
+package rides
 
 import (
 	"context"
 	"encoding/json"
 	"net/http"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
 	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
 )
@@ -58,9 +59,9 @@ func (h *Handler) accept(ctx context.Context, req api.Request) (api.Response, er
 	input := AcceptedInput{
 		RideID:          req.Param("rideId"),
 		DriverID:        in.DriverID,
-		AcceptanceID:    uuid.NewString(),
-		StatusHistoryID: uuid.NewString(),
-		OutboxID:        uuid.NewString(),
+		AcceptanceID:    uuid.New().String(),
+		StatusHistoryID: uuid.New().String(),
+		OutboxID:        uuid.New().String(),
 	}
 	ride, err := h.service.Accepted(ctx, input)
 	if err != nil {
@@ -75,10 +76,10 @@ func (h *Handler) request(ctx context.Context, req api.Request) (api.Response, e
 		return api.Response{}, err
 	}
 	if in.ID == "" {
-		in.ID = uuid.NewString()
+		in.ID = uuid.New().String()
 	}
 	if in.RiderID == "" {
-		in.RiderID = uuid.NewString()
+		in.RiderID = uuid.New().String()
 	}
 	if _, err := uuid.Parse(in.ID); err != nil {
 		return api.Response{}, apierrors.Validation("id", "must be a UUID")

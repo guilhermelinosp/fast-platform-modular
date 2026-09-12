@@ -1,4 +1,4 @@
-package rider
+package rides
 
 import (
 	"context"
@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
+
 	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
 )
 
@@ -46,11 +47,11 @@ func (s *Service) Requested(ctx context.Context, input RequestedInput) (RideOutp
 	}
 
 	if input.StatusHistoryID == "" {
-		input.StatusHistoryID = uuid.NewString()
+		input.StatusHistoryID = uuid.New().String()
 	}
 
 	if input.OutboxID == "" {
-		input.OutboxID = uuid.NewString()
+		input.OutboxID = uuid.New().String()
 	}
 
 	input.Payload, _ = json.Marshal(Requested{
