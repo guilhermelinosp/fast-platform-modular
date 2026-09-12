@@ -51,6 +51,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    uses: guilhermelinosp/templates/.github/workflows/buildah.yml@af2bcbe5d72882b5ab9145a02620d229dd14587f # main
+    uses: guilhermelinosp/templates/.github/workflows/buildah.yml@9aa28e4932048b724e165f169963643e8c4bcd69 # main
     with:
       version: ${{ needs.release.outputs.version }}
