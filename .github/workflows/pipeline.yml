@@ -37,7 +37,7 @@ jobs:
     secrets: inherit
   image:
     name: image
-    needs: [release, quality]
+    needs: [release]
     permissions:
       contents: read
       packages: write
