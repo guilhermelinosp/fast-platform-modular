@@ -40,8 +40,6 @@ jobs:
       pull-requests: write
     uses: guilhermelinosp/templates/.github/workflows/lib-quality.yml@745ef1ca8288cd320b0b4dcf1485e34003945c79
     with:
-    uses: guilhermelinosp/templates/.github/workflows/lib-quality.yml@745ef1ca8288cd320b0b4dcf1485e34003945c79
-    with:
       go-version-file: go.mod
 
   image:
