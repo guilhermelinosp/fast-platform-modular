@@ -22,7 +22,12 @@ type Requested struct {
 }
 
 // MessageType returns the requested event type.
-func (Requested) MessageType() string { return os.Getenv("HELLNET_KAFKA_TOPIC_RIDE_REQUESTED") }
+func (Requested) MessageType() string {
+	if topic := os.Getenv("HELLNET_KAFKA_TOPIC_RIDE_REQUESTED"); topic != "" {
+		return topic
+	}
+	return "fast-ride-requested.v1"
+}
 
 // Accepted is the Kafka event emitted when a ride is accepted.
 type Accepted struct {
@@ -34,7 +39,12 @@ type Accepted struct {
 }
 
 // MessageType returns the accepted event type.
-func (Accepted) MessageType() string { return os.Getenv("HELLNET_KAFKA_TOPIC_RIDE_ACCEPTED") }
+func (Accepted) MessageType() string {
+	if topic := os.Getenv("HELLNET_KAFKA_TOPIC_RIDE_ACCEPTED"); topic != "" {
+		return topic
+	}
+	return "fast-ride-accepted.v1"
+}
 
 // RequestedInput contains data needed to request a ride.
 type RequestedInput struct {

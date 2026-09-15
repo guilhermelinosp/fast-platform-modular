@@ -19,6 +19,7 @@ type Handler struct {
 
 type requestInput struct {
 	ID                   string  `json:"id"`
+	RiderID              string  `json:"rider_id"`
 	PickupLatitude       float64 `json:"pickup_latitude"`
 	PickupLongitude      float64 `json:"pickup_longitude"`
 	DestinationLatitude  float64 `json:"destination_latitude"`
@@ -49,7 +50,10 @@ func (h *Handler) request(ctx context.Context, req api.Request) (api.Response, e
 	}
 	riderID := req.Header("rider_id")
 	if riderID == "" {
-		return api.Response{}, errors.Validation("rider_id", "header is required")
+		riderID = in.RiderID
+	}
+	if riderID == "" {
+		riderID = uuid.New().String()
 	}
 	if _, err := uuid.Parse(in.ID); err != nil {
 		return api.Response{}, errors.Validation("id", "must be a UUID")
