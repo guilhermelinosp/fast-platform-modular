@@ -2,30 +2,23 @@ package rides
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"uuid"
 
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
-	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
+	"github.com/guilhermelinosp/hellnet-lib-api/errors"
 )
 
 // Handler exposes the rider HTTP routes.
 type Handler struct {
 	service interface {
 		Requested(context.Context, RequestedInput) (RideOutput, error)
-		Accepted(context.Context, AcceptedInput) (RideOutput, error)
 	}
-}
-
-type acceptInput struct {
-	DriverID string `json:"driver_id"`
 }
 
 type requestInput struct {
 	ID                   string  `json:"id"`
-	RiderID              string  `json:"rider_id"`
 	PickupLatitude       float64 `json:"pickup_latitude"`
 	PickupLongitude      float64 `json:"pickup_longitude"`
 	DestinationLatitude  float64 `json:"destination_latitude"`
@@ -35,7 +28,6 @@ type requestInput struct {
 // NewHandler creates a rider HTTP handler.
 func NewHandler(service interface {
 	Requested(context.Context, RequestedInput) (RideOutput, error)
-	Accepted(context.Context, AcceptedInput) (RideOutput, error)
 }) *Handler {
 	return &Handler{service: service}
 }
@@ -44,30 +36,7 @@ func NewHandler(service interface {
 func (h *Handler) Routes() []api.Route {
 	return []api.Route{
 		{Method: http.MethodPost, Path: "/rides", Handler: api.HandlerFunc(h.request)},
-		{Method: http.MethodPost, Path: "/rides/{rideId}/accept", Handler: api.HandlerFunc(h.accept)},
 	}
-}
-
-func (h *Handler) accept(ctx context.Context, req api.Request) (api.Response, error) {
-	var in acceptInput
-	if err := req.Bind(&in); err != nil {
-		return api.Response{}, err
-	}
-	if _, err := uuid.Parse(in.DriverID); err != nil {
-		return api.Response{}, apierrors.Validation("driver_id", "must be a UUID")
-	}
-	input := AcceptedInput{
-		RideID:          req.Param("rideId"),
-		DriverID:        in.DriverID,
-		AcceptanceID:    uuid.New().String(),
-		StatusHistoryID: uuid.New().String(),
-		OutboxID:        uuid.New().String(),
-	}
-	ride, err := h.service.Accepted(ctx, input)
-	if err != nil {
-		return api.Response{}, err
-	}
-	return api.JSON(http.StatusCreated, ride), nil
 }
 
 func (h *Handler) request(ctx context.Context, req api.Request) (api.Response, error) {
@@ -78,24 +47,23 @@ func (h *Handler) request(ctx context.Context, req api.Request) (api.Response, e
 	if in.ID == "" {
 		in.ID = uuid.New().String()
 	}
-	if in.RiderID == "" {
-		in.RiderID = uuid.New().String()
+	riderID := req.Header("rider_id")
+	if riderID == "" {
+		return api.Response{}, errors.Validation("rider_id", "header is required")
 	}
 	if _, err := uuid.Parse(in.ID); err != nil {
-		return api.Response{}, apierrors.Validation("id", "must be a UUID")
+		return api.Response{}, errors.Validation("id", "must be a UUID")
 	}
-	if _, err := uuid.Parse(in.RiderID); err != nil {
-		return api.Response{}, apierrors.Validation("rider_id", "must be a UUID")
+	if _, err := uuid.Parse(riderID); err != nil {
+		return api.Response{}, errors.Validation("rider_id", "must be a UUID")
 	}
-	payload, _ := json.Marshal(in)
 	input := RequestedInput{
 		ID:                   in.ID,
-		RiderID:              in.RiderID,
+		RiderID:              riderID,
 		PickupLatitude:       in.PickupLatitude,
 		PickupLongitude:      in.PickupLongitude,
 		DestinationLatitude:  in.DestinationLatitude,
 		DestinationLongitude: in.DestinationLongitude,
-		Payload:              payload,
 	}
 	ride, err := h.service.Requested(ctx, input)
 	if err != nil {
