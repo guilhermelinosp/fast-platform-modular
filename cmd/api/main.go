@@ -13,6 +13,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/guilhermelinosp/fast-platform-modular/internal/drives"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/events"
 	"github.com/guilhermelinosp/fast-platform-modular/internal/rides"
 	"github.com/guilhermelinosp/hellnet-lib-api/adapter"
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
@@ -47,6 +49,12 @@ func run() error {
 		return err
 	}
 
+	db, err := database.New()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+
 	requested, err := kafka.NewProducer[rides.Requested]()
 	if err != nil {
 		return err
@@ -59,22 +67,22 @@ func run() error {
 	}
 	defer func() { _ = accepted.Close() }()
 
-	db, err := database.New()
+	publishers, err := events.NewPublisher(db, requested, accepted)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = db.Close() }()
+	defer publishers.Close()
 
-	repository := rides.NewDatabase(db)
+	riderService := rides.NewService(tel.Logger, rides.NewRepository(db))
+	driverService := drives.NewService(tel.Logger, drives.NewRepository(db))
 
-	producers := rides.NewPublisher(requested, accepted)
-
-	handler := rides.NewHandler(rides.NewService(tel.Logger, repository, producers))
+	rideHandler := rides.NewHandler(riderService)
+	driveHandler := drives.NewHandler(driverService)
 
 	router := adapter.New(cfg, tel.Logger)
 
 	api.RegisterPlatform(router, api.Deps{
-		Routes: handler.Routes(),
+		Routes: append(rideHandler.Routes(), driveHandler.Routes()...),
 		Platform: api.PlatformHandlers{
 			Live:   tel.Live(),
 			Ready:  tel.Ready(),

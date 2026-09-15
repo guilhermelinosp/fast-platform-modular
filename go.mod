@@ -5,8 +5,9 @@ go 1.27.0
 require (
 	github.com/guilhermelinosp/hellnet-lib-api v1.14.2
 	github.com/guilhermelinosp/hellnet-lib-database v1.0.3
-	github.com/guilhermelinosp/hellnet-lib-kafka v1.6.12
+	github.com/guilhermelinosp/hellnet-lib-kafka v1.6.13-0.20260912174303-4a9780779372
 	github.com/guilhermelinosp/hellnet-lib-telemetry v1.5.4
+	github.com/jackc/pgx/v5 v5.11.0
 )
 
 require (
@@ -37,7 +38,6 @@ require (
 	github.com/iskorotkov/avro/v2 v2.34.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
-	github.com/jackc/pgx/v5 v5.11.0 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
