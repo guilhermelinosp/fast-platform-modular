@@ -17,8 +17,10 @@ tags:
     description: Service discovery and Kubernetes probes (provided by the template)
   - name: observability
     description: Health/reporting endpoints backed by hellnet-lib-telemetry
-  - name: hello
-    description: Reference business module (/api/v1)
+  - name: rides
+    description: Rider ride lifecycle operations
+  - name: drives
+    description: Driver actions on rides
 
 paths:
   /:
@@ -51,6 +53,11 @@ paths:
       responses:
         "200":
           description: Process is alive
+          content:
+            application/json:
+              schema: { type: object }
+        "503":
+          description: Degraded or not ready
           content:
             application/json:
               schema: { type: object }
@@ -88,14 +95,140 @@ paths:
           content:
             application/json:
               schema: { type: object }
-        "503":
-          description: Degraded or not ready
+
+  /rides:
+    post:
+      tags: [rides]
+      summary: Request a ride
+      operationId: requestRide
+      parameters:
+        - $ref: "#/components/parameters/RiderIDHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RideRequest"
+      responses:
+        "201":
+          description: Ride created
           content:
             application/json:
-              schema: { type: object }
+              schema:
+                $ref: "#/components/schemas/Ride"
+        "400":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+
+  /drives/{rideId}/accept:
+    post:
+      tags: [drives]
+      summary: Accept a ride
+      operationId: acceptRide
+      parameters:
+        - name: rideId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/DriverIDHeader"
+      responses:
+        "201":
+          description: Ride accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RideAcceptance"
+        "400":
+          $ref: "#/components/responses/Error"
+        "409":
+          description: Ride has already been accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          $ref: "#/components/responses/Error"
 
 components:
+  parameters:
+    RiderIDHeader:
+      name: rider_id
+      in: header
+      required: false
+      description: Rider identifier. If omitted, a UUID is generated.
+      schema:
+        type: string
+        format: uuid
+    DriverIDHeader:
+      name: driver_id
+      in: header
+      required: true
+      description: Driver identifier accepting the ride.
+      schema:
+        type: string
+        format: uuid
   schemas:
+    RideRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - pickup_latitude
+        - pickup_longitude
+        - destination_latitude
+        - destination_longitude
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Optional ride identifier. Generated when omitted.
+        rider_id:
+          type: string
+          format: uuid
+          description: Optional rider identifier. The rider_id header takes precedence.
+        pickup_latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        pickup_longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        destination_latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        destination_longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+    Ride:
+      type: object
+      required:
+        - id
+        - rider_id
+        - pickup_latitude
+        - pickup_longitude
+        - destination_latitude
+        - destination_longitude
+      properties:
+        id: { type: string, format: uuid }
+        rider_id: { type: string, format: uuid }
+        pickup_latitude: { type: number, format: double }
+        pickup_longitude: { type: number, format: double }
+        destination_latitude: { type: number, format: double }
+        destination_longitude: { type: number, format: double }
+    RideAcceptance:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string, format: uuid }
     GreetInput:
       type: object
       additionalProperties: false

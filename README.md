@@ -147,6 +147,61 @@ endpoint, OTLP export is disabled while stdout logs and `/metrics` stay active.
 
 Full variable reference: <https://github.com/guilhermelinosp/hellnet-lib-telemetry>
 
+### Driver notifications / webhook
+
+The backend consumes the same Kafka ride-requested message as the producer and
+sends it through `Kafka -> NotificationSink -> webhook dispatcher` to the
+external notification service. The service can then fan out the notification as
+a push message to the Driver app. Flutter is not changed and does not consume
+Kafka directly.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `HELLNET_KAFKA_DRIVER_BFF_CONSUMER_GROUP` | `fast-driver-bff` | Dedicated group; never share the matching group |
+| `FAST_NOTIFICATION_WEBHOOK_URL` | *(disabled)* | Absolute `http`/`https` endpoint; enables the notification consumer |
+| `FAST_NOTIFICATION_WEBHOOK_SECRET` | *(required with URL)* | HMAC-SHA256 signing secret |
+| `FAST_NOTIFICATION_WEBHOOK_TIMEOUT` | `5s` | Per-attempt HTTP timeout |
+| `FAST_NOTIFICATION_WEBHOOK_MAX_RETRIES` | `3` | Retries after the initial request, maximum `10` |
+| `FAST_NOTIFICATION_WEBHOOK_BACKOFF` | `250ms` | Exponential retry backoff, maximum `30s` |
+
+`HELLNET_KAFKA_TOPIC_RIDE_REQUESTED` is unchanged. Its current default is
+`fast-ride-requested.v1`; when set (for example to
+`fast.ride.requested.v1` in `cmd/api/.env`), the consumer uses that exact topic.
+`HELLNET_KAFKA_TOPIC_PREFIX`, when used, is resolved by the Kafka library in
+the same way for the producer and consumer.
+
+#### Webhook contract
+
+Each consumed `ride.requested.v1` event produces one JSON `POST` body. The
+`ride` object is the original Kafka event, preserving its existing camelCase
+fields:
+
+```json
+{
+  "event": "ride.requested.v1",
+  "event_id": "event-id",
+  "ride": {
+    "eventId": "event-id",
+    "eventVersion": 1,
+    "occurredAt": 1720000000000,
+    "rideId": "ride-id",
+    "riderId": "rider-id",
+    "pickupLatitude": -23.56,
+    "pickupLongitude": -46.65,
+    "destinationLatitude": -23.55,
+    "destinationLongitude": -46.64
+  }
+}
+```
+
+`driver_id` is included only when a caller supplies one; the current
+`rides.Requested` Kafka model contains no driver ID or driver token, so the
+integrated consumer omits it. No driver targeting or persistence is invented.
+The signature is `sha256=<lowercase hex HMAC-SHA256(body)>` in
+`X-Notification-Signature`. `X-Notification-Event-ID` and `Idempotency-Key`
+also carry `event_id` when present. HTTP 2xx succeeds; network errors, 408,
+429, and 5xx are retried, while other statuses fail without retry.
+
 ---
 
 ## Observability

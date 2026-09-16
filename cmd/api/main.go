@@ -16,6 +16,7 @@ import (
 	"github.com/guilhermelinosp/fast-platform-modular/internal/drives"
 	"github.com/guilhermelinosp/fast-platform-modular/internal/events"
 	"github.com/guilhermelinosp/fast-platform-modular/internal/rides"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/webhooks"
 	"github.com/guilhermelinosp/hellnet-lib-api/adapter"
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
 	"github.com/guilhermelinosp/hellnet-lib-api/config"
@@ -43,7 +44,6 @@ func run() error {
 	if err != nil {
 		return err
 	}
-
 	tel, err := telemetry.New()
 	if err != nil {
 		return err
@@ -75,6 +75,23 @@ func run() error {
 
 	riderService := rides.NewService(tel.Logger, rides.NewRepository(db))
 	driverService := drives.NewService(tel.Logger, drives.NewRepository(db))
+	notificationDispatcher, err := webhooks.NewDispatcher()
+
+	if err != nil {
+		return err
+	}
+	var notificationConsumer *kafka.Consumer[rides.Requested]
+	if notificationDispatcher != nil {
+		notificationConsumer, err = webhooks.NewConsumer(notificationDispatcher)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := notificationConsumer.Close(); err != nil {
+				tel.Logger.Warn("notification consumer close failed", slog.Any("error", err))
+			}
+		}()
+	}
 
 	rideHandler := rides.NewHandler(riderService)
 	driveHandler := drives.NewHandler(driverService)
@@ -89,6 +106,14 @@ func run() error {
 			Health: tel.Health(),
 		},
 	})
+
+	if notificationConsumer != nil {
+		go func() {
+			if err := notificationConsumer.RunContext(ctx); err != nil && ctx.Err() == nil {
+				tel.Logger.Error("notification consumer stopped", slog.Any("error", err))
+			}
+		}()
+	}
 
 	srv := server.New(cfg, tel.Logger, telemetry.Middleware(tel, router))
 	if err := srv.Run(ctx); err != nil {
