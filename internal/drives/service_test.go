@@ -118,6 +118,46 @@ func TestServiceAcceptedMapsConflictToAlreadyAccepted(t *testing.T) {
 	}
 }
 
+func TestServiceAcceptedMapsDriverNotFound(t *testing.T) {
+	repo := &fakeRepository{err: ErrDriverNotFound}
+	service := NewService(nil, repo)
+
+	_, err := service.Accepted(context.Background(), AcceptedInput{
+		RideID:   "00000000-0000-0000-0000-000000000001",
+		DriverID: "00000000-0000-0000-0000-000000000002",
+	})
+	if err == nil {
+		t.Fatal("Accepted() error = nil, want DRIVER_NOT_FOUND")
+	}
+	var apiErr *apierrors.Error
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("error type = %T, want *errors.Error", err)
+	}
+	if apiErr.Status != http.StatusNotFound || apiErr.Code != "DRIVER_NOT_FOUND" {
+		t.Fatalf("error = %+v, want status 404 DRIVER_NOT_FOUND", apiErr)
+	}
+}
+
+func TestServiceAcceptedMapsRideNotAcceptable(t *testing.T) {
+	repo := &fakeRepository{err: ErrRideNotAcceptable}
+	service := NewService(nil, repo)
+
+	_, err := service.Accepted(context.Background(), AcceptedInput{
+		RideID:   "00000000-0000-0000-0000-000000000001",
+		DriverID: "00000000-0000-0000-0000-000000000002",
+	})
+	if err == nil {
+		t.Fatal("Accepted() error = nil, want RIDE_NOT_ACCEPTABLE")
+	}
+	var apiErr *apierrors.Error
+	if !errors.As(err, &apiErr) {
+		t.Fatalf("error type = %T, want *errors.Error", err)
+	}
+	if apiErr.Status != http.StatusConflict || apiErr.Code != "RIDE_NOT_ACCEPTABLE" {
+		t.Fatalf("error = %+v, want status 409 RIDE_NOT_ACCEPTABLE", apiErr)
+	}
+}
+
 func TestServiceAcceptedPropagatesOtherErrors(t *testing.T) {
 	t.Run("different unique constraint", func(t *testing.T) {
 		pgErr := &pgconn.PgError{Code: "23505", ConstraintName: "rides_pkey"}

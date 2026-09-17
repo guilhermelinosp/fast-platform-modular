@@ -12,12 +12,13 @@ import (
 
 // fakeTx records every SQL statement the repository executes, in order, and
 // returns per-statement results (defaulting to success) so tests can force a
-// failure at any step.
+// failure or a zero-row guard result at any step.
 type fakeTx struct {
-	stmts   []string
-	args    [][]any
-	failAt  int
-	failErr error
+	stmts      []string
+	args       [][]any
+	failAt     int
+	failErr    error
+	zeroRowsAt map[int]bool // statement index -> return 0 rows (guard failed)
 }
 
 func (f *fakeTx) run(fn func(execute execFn) error) error {
@@ -27,6 +28,10 @@ func (f *fakeTx) run(fn func(execute execFn) error) error {
 		f.args = append(f.args, args)
 		if f.failErr != nil && i == f.failAt {
 			return 0, f.failErr
+		}
+		if f.zeroRowsAt[i] {
+			i++
+			return 0, nil
 		}
 		i++
 		return 1, nil
@@ -140,5 +145,30 @@ func TestRepositoryAcceptedFailsOnOutboxInsert(t *testing.T) {
 	}
 	if len(tx.stmts) != 3 {
 		t.Errorf("statements = %d, want 3 (two inserts then outbox failed)", len(tx.stmts))
+	}
+}
+
+func TestRepositoryAcceptedFailsWhenDriverMissing(t *testing.T) {
+	tx := &fakeTx{zeroRowsAt: map[int]bool{0: true}}
+	installFakeTx(t, tx)
+
+	_, err := NewRepository(nil).Accepted(context.Background(), AcceptedInput{RideID: "ride-1", DriverID: "ghost-driver"})
+	if !errors.Is(err, ErrDriverNotFound) {
+		t.Fatalf("error = %v, want ErrDriverNotFound", err)
+	}
+	if len(tx.stmts) != 1 {
+		t.Errorf("statements = %d, want 1 (abort after driver guard)", len(tx.stmts))
+	}
+}
+
+func TestRepositoryAcceptedFailsWhenRideNotAcceptable(t *testing.T) {
+	// A ride that was never requested (no status_id=1) or already accepted
+	// (status_id=3) both abort at the status-history guard (statement 1).
+	tx := &fakeTx{zeroRowsAt: map[int]bool{1: true}}
+	installFakeTx(t, tx)
+
+	_, err := NewRepository(nil).Accepted(context.Background(), AcceptedInput{RideID: "ride-1", DriverID: "driver-1"})
+	if !errors.Is(err, ErrRideNotAcceptable) {
+		t.Fatalf("error = %v, want ErrRideNotAcceptable", err)
 	}
 }
