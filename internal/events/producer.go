@@ -18,6 +18,32 @@ const (
 	outboxReloadAt = 5 * time.Second
 )
 
+// outboxStore reads pending outbox rows. The database-backed implementation
+// reads from PostgreSQL; tests inject fakes. This is the only data access the
+// publisher needs, so the read path stays unit-testable without a database.
+type outboxStore interface {
+	QueryRow(id string) (OutboxEvent, bool, error)
+	QueryPending() ([]OutboxEvent, error)
+}
+
+// dbOutboxStore is the PostgreSQL-backed outboxStore.
+type dbOutboxStore struct{ db *database.DB }
+
+// QueryRow selects one outbox event by id.
+func (s dbOutboxStore) QueryRow(id string) (OutboxEvent, bool, error) {
+	return database.QueryRow[OutboxEvent](s.db, `SELECT id, event_type, event_version, payload FROM outbox_events WHERE id = $1`, id)
+}
+
+// QueryPending selects outbox rows awaiting publication.
+func (s dbOutboxStore) QueryPending() ([]OutboxEvent, error) {
+	return database.Query[OutboxEvent](s.db, `SELECT id, event_type, event_version, payload FROM outbox_events WHERE published_at IS NULL ORDER BY occurred_at LIMIT 100`)
+}
+
+// requestedPublisher and acceptedPublisher are the Kafka producer ports. The
+// concrete *kafka.Producer types satisfy them; tests inject fakes.
+type requestedPublisher interface{ Publish(rides.Requested) error }
+type acceptedPublisher interface{ Publish(rides.Accepted) error }
+
 // Publisher listens for committed outbox rows and publishes them to Kafka.
 //
 // The outbox table is append-only from the application's point of view:
@@ -27,9 +53,9 @@ const (
 // restart. This yields at-least-once semantics: a duplicate publish is
 // possible after a crash or once an id ages out of the in-memory memo.
 type Publisher struct {
-	db           *database.DB
-	requested    *kafka.Producer[rides.Requested]
-	accepted     *kafka.Producer[rides.Accepted]
+	store        outboxStore
+	requested    requestedPublisher
+	accepted     acceptedPublisher
 	listenerConn *database.Conn
 	stopListen   func() error
 	stopScan     chan struct{}
@@ -55,7 +81,7 @@ func NewPublisher(db *database.DB, requested *kafka.Producer[rides.Requested], a
 		return nil, fmt.Errorf("acquire outbox listener connection: %w", err)
 	}
 	p := &Publisher{
-		db:           db,
+		store:        dbOutboxStore{db: db},
 		requested:    requested,
 		accepted:     accepted,
 		listenerConn: conn,
@@ -91,7 +117,7 @@ func (p *Publisher) publishByID(id string) {
 	if !p.memo.start(id) {
 		return
 	}
-	event, found, err := database.QueryRow[OutboxEvent](p.db, `SELECT id, event_type, event_version, payload FROM outbox_events WHERE id = $1`, id)
+	event, found, err := p.store.QueryRow(id)
 	if err != nil {
 		p.memo.release(id)
 		slog.Default().Error("outbox select failed", "error", err, "event_id", id)
@@ -138,17 +164,23 @@ func (p *Publisher) reconcileLoop() {
 	for {
 		select {
 		case <-ticker.C:
-			events, err := database.Query[OutboxEvent](p.db, `SELECT id, event_type, event_version, payload FROM outbox_events WHERE published_at IS NULL ORDER BY occurred_at LIMIT 100`)
-			if err != nil {
-				slog.Default().Error("outbox reconciliation failed", "error", err)
-				continue
-			}
-			for _, event := range events {
-				p.publishByID(event.ID)
-			}
+			p.reconcileOnce()
 		case <-p.stopScan:
 			return
 		}
+	}
+}
+
+// reconcileOnce sweeps the pending outbox rows once. It is the body of the
+// reconcile loop, extracted so tests can drive a single iteration directly.
+func (p *Publisher) reconcileOnce() {
+	events, err := p.store.QueryPending()
+	if err != nil {
+		slog.Default().Error("outbox reconciliation failed", "error", err)
+		return
+	}
+	for _, event := range events {
+		p.publishByID(event.ID)
 	}
 }
 
