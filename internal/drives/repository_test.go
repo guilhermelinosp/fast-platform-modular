@@ -48,13 +48,13 @@ func TestRepositoryAcceptedInsertsAcceptanceHistoryOutboxInOrder(t *testing.T) {
 	installFakeTx(t, tx)
 
 	input := AcceptedInput{
-		RideID:           "ride-1",
-		DriverID:         "driver-1",
-		AcceptanceID:     "acceptance-1",
-		StatusHistoryID:  "status-1",
-		OutboxID:         "outbox-1",
-		Payload:          []byte(`{"eventId":"outbox-1"}`),
-		EventType:        "fast.ride.accepted.v1",
+		RideID:          "ride-1",
+		DriverID:        "driver-1",
+		AcceptanceID:    "acceptance-1",
+		StatusHistoryID: "status-1",
+		OutboxID:        "outbox-1",
+		Payload:         []byte(`{"eventId":"outbox-1"}`),
+		EventType:       "fast.ride.accepted.v1",
 	}
 
 	got, err := NewRepository(nil).Accepted(context.Background(), input)
