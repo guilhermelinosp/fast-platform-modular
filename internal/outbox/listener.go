@@ -28,13 +28,13 @@ func (s dbOutboxStore) QueryPending() ([]Event, error) {
 }
 
 func (s dbOutboxStore) RecordPublished(id string) error {
-	_, err := s.db.Execute(`INSERT INTO outbox_publications (event_id, published_at)
-SELECT $1, now() WHERE NOT EXISTS (SELECT 1 FROM outbox_publications WHERE event_id = $1)`, id)
+	_, err := s.db.Execute(`INSERT INTO outbox_publications (id, event_id, published_at)
+SELECT gen_random_uuid(), $1, now() WHERE NOT EXISTS (SELECT 1 FROM outbox_publications WHERE event_id = $1)`, id)
 	return err
 }
 
 func (s dbOutboxStore) RecordFailure(id string, reason string) error {
-	_, err := s.db.Execute(`INSERT INTO outbox_publication_failures (id, event_id, reason, failed_at)
+	_, err := s.db.Execute(`INSERT INTO outbox_publication_failures (id, event_id, error, failed_at)
 VALUES (gen_random_uuid(), $1, $2, now())`, id, reason)
 	return err
 }
