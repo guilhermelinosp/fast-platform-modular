@@ -14,9 +14,9 @@ import (
 	"syscall"
 
 	"github.com/guilhermelinosp/fast-platform-modular/internal/drives"
-	"github.com/guilhermelinosp/fast-platform-modular/internal/events"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/outbox"
 	"github.com/guilhermelinosp/fast-platform-modular/internal/rides"
-	"github.com/guilhermelinosp/fast-platform-modular/internal/webhooks"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/sockets"
 	"github.com/guilhermelinosp/hellnet-lib-api/adapter"
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
 	"github.com/guilhermelinosp/hellnet-lib-api/config"
@@ -67,36 +67,45 @@ func run() error {
 	}
 	defer func() { _ = accepted.Close() }()
 
-	publishers, err := events.NewPublisher(db, requested, accepted)
+	producer := outbox.NewProducer(requested, accepted)
+	listener, err := outbox.NewListener(db, producer)
 	if err != nil {
 		return err
 	}
-	defer publishers.Close()
+	defer listener.Close()
 
 	riderService := rides.NewService(tel.Logger, rides.NewRepository(db))
 	driverService := drives.NewService(tel.Logger, drives.NewRepository(db))
-	notificationDispatcher, err := webhooks.NewDispatcher()
-
-	if err != nil {
-		return err
-	}
-	var notificationConsumer *kafka.Consumer[rides.Requested]
-	if notificationDispatcher != nil {
-		notificationConsumer, err = webhooks.NewConsumer(notificationDispatcher)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := notificationConsumer.Close(); err != nil {
-				tel.Logger.Warn("notification consumer close failed", slog.Any("error", err))
-			}
-		}()
-	}
 
 	rideHandler := rides.NewHandler(riderService)
 	driveHandler := drives.NewHandler(driverService)
 
 	router := adapter.New(cfg, tel.Logger)
+
+	// Mount Socket.IO handler at /socket.io/
+	socketServer := sockets.NewServer()
+	router.Mount("GET", "/socket.io/", socketServer.Handler())
+	router.Mount("POST", "/socket.io/", socketServer.Handler())
+
+	notificationConsumer, err := sockets.NewConsumer(socketServer)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := notificationConsumer.Close(); err != nil {
+			tel.Logger.Warn("notification consumer close failed", slog.Any("error", err))
+		}
+	}()
+
+	acceptedConsumer, err := sockets.NewAcceptedConsumer(socketServer)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := acceptedConsumer.Close(); err != nil {
+			tel.Logger.Warn("accepted consumer close failed", slog.Any("error", err))
+		}
+	}()
 
 	api.RegisterPlatform(router, api.Deps{
 		Routes: append(rideHandler.Routes(), driveHandler.Routes()...),
