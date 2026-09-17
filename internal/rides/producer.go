@@ -1,15 +1,18 @@
 package rides
 
-import "github.com/guilhermelinosp/hellnet-lib-kafka/kafka"
+// requestedProducer and acceptedProducer are the Kafka producer ports. The
+// concrete *kafka.Producer types satisfy them; tests inject fakes.
+type requestedProducer interface{ Publish(Requested) error }
+type acceptedProducer interface{ Publish(Accepted) error }
 
 // Publisher publishes rider events to Kafka.
 type Publisher struct {
-	requested *kafka.Producer[Requested]
-	accepted  *kafka.Producer[Accepted]
+	requested requestedProducer
+	accepted  acceptedProducer
 }
 
 // NewPublisher creates a Kafka publisher.
-func NewPublisher(requested *kafka.Producer[Requested], accepted *kafka.Producer[Accepted]) *Publisher {
+func NewPublisher(requested requestedProducer, accepted acceptedProducer) *Publisher {
 	return &Publisher{requested: requested, accepted: accepted}
 }
 
