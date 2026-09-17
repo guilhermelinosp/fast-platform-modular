@@ -1,3 +1,4 @@
+---
 output: false
 
 pre-commit:
@@ -9,8 +10,19 @@ pre-commit:
     vet:
       glob: "*.go"
       run: go vet ./...
+    test:
+      glob: "*.go"
+      run: go test -count=1 ./...
+    race:
+      glob: "*.go"
+      run: go test -count=1 -race ./...
+    build:
+      glob: "*.go"
+      run: go build ./...
     tidy:
-      run: go mod tidy && git diff --exit-code go.mod $([ -f go.sum ] && echo go.sum)
+      run: >-
+        go mod tidy &&
+        git diff --exit-code go.mod $([ -f go.sum ] && echo go.sum)
     lint:
       run: |
         if command -v golangci-lint >/dev/null 2>&1; then
@@ -18,6 +30,9 @@ pre-commit:
         else
           echo "golangci-lint not installed; skipping"
         fi
+    yamllint:
+      glob: "*.{yaml,yml}"
+      run: test -z "{staged_files}" || yamllint {staged_files}
     secrets-scan:
       glob: "*.{yaml,yml,go,json,sh}"
       run: |
@@ -27,12 +42,26 @@ pre-commit:
           echo "gitleaks not installed; skipping"
         fi
 
+    govulncheck:
+      run: |
+        if command -v govulncheck >/dev/null 2>&1; then
+          govulncheck ./...
+        else
+          echo "govulncheck not installed; skipping"
+        fi
+    mod-verify:
+      run: go mod verify
+
 pre-push:
   commands:
     test:
       run: go test -count=1 -race ./...
+    build:
+      run: go build ./...
 
 commit-msg:
   commands:
     conventional:
-      run: 'grep -Eq "^(feat|fix|docs|style|refactor|perf|test|ci|chore|revert|ops)(\\(.+\\))?!?: .+" {1}'
+      run: >-
+        grep -Eq "^(feat|fix|docs|style|refactor|perf|test|ci|chore|revert|ops)"
+        "(\(.+\))?!?: .+" {1}
