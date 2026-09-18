@@ -10,11 +10,6 @@ import (
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 )
 
-const (
-	defaultConsumerGroup         = "fast-driver-bff"
-	defaultAcceptedConsumerGroup = "fast-driver-bff-accepted"
-)
-
 // ConsumerGroup returns the dedicated group used by the driver BFF.
 func ConsumerGroup() string {
 	return environments.GetString("HELLNET_KAFKA_", "", "DRIVER_BFF_CONSUMER_GROUP", "fast-driver-bff")

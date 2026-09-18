@@ -7,19 +7,26 @@ import (
 	"strings"
 
 	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
+	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 	socketio "github.com/zishang520/socket.io/servers/socket/v3"
 )
 
-const (
-	driversNamespace = "/drivers"
-	ordersNamespace  = "/orders"
+func driversNamespace() string {
+	return environments.GetString("HELLNET_SOCKET_", "", "DRIVERS_NAMESPACE", "/drivers")
+}
 
-	// OrderRequestedEvent is emitted to driver clients when an order is requested.
-	OrderRequestedEvent = "order.requested"
-	// OrderAcceptedEvent is emitted to the rider client when an order is accepted.
-	OrderAcceptedEvent = "order.accepted"
-)
+func ordersNamespace() string {
+	return environments.GetString("HELLNET_SOCKET_", "", "ORDERS_NAMESPACE", "/orders")
+}
+
+func orderRequestedEvent() string {
+	return environments.GetString("HELLNET_SOCKET_", "", "ORDER_REQUESTED_EVENT", "order.requested")
+}
+
+func orderAcceptedEvent() string {
+	return environments.GetString("HELLNET_SOCKET_", "", "ORDER_ACCEPTED_EVENT", "order.accepted")
+}
 
 // Server is the mobile Socket.IO gateway. Kafka consumers emit durable ride
 // events through it; it does not make outbound HTTP webhook calls.
@@ -35,8 +42,8 @@ type Server struct {
 // order room with the "order.subscribe" event.
 func NewServer(tel telemetry.Client) *Server {
 	io := socketio.NewServer(nil, nil)
-	drivers := io.Of(driversNamespace, nil)
-	orderClients := io.Of(ordersNamespace, nil)
+	drivers := io.Of(driversNamespace(), nil)
+	orderClients := io.Of(ordersNamespace(), nil)
 
 	_ = orderClients.On("connection", func(args ...any) {
 		client, ok := args[0].(*socketio.Socket)
@@ -64,7 +71,7 @@ func (s *Server) Handler() http.Handler { return s.io.ServeHandler(nil) }
 // EmitRequested broadcasts an order request to connected driver applications.
 func (s *Server) EmitRequested(event orders.OrderRequested) error {
 	if s.tel == nil {
-		return s.drivers.Emit(OrderRequestedEvent, event)
+		return s.drivers.Emit(orderRequestedEvent(), event)
 	}
 	return s.tel.WithSpan("socket.emit.order_requested", func(ctx context.Context) error {
 		s.tel.Log().Info("socket.emit.order_requested",
@@ -73,14 +80,14 @@ func (s *Server) EmitRequested(event orders.OrderRequested) error {
 			"event_id", event.EventID,
 			"event_version", event.EventVersion,
 		)
-		return s.drivers.Emit(OrderRequestedEvent, event)
+		return s.drivers.Emit(orderRequestedEvent(), event)
 	})
 }
 
 // EmitAccepted sends acceptance to the mobile client subscribed to this order.
 func (s *Server) EmitAccepted(event orders.OrderAccepted) error {
 	if s.tel == nil {
-		return s.orders.To(socketio.Room(orderRoom(event.OrderID))).Emit(OrderAcceptedEvent, event)
+		return s.orders.To(socketio.Room(orderRoom(event.OrderID))).Emit(orderAcceptedEvent(), event)
 	}
 	return s.tel.WithSpan("socket.emit.order_accepted", func(ctx context.Context) error {
 		s.tel.Log().Info("socket.emit.order_accepted",
@@ -89,7 +96,7 @@ func (s *Server) EmitAccepted(event orders.OrderAccepted) error {
 			"event_id", event.EventID,
 			"event_version", event.EventVersion,
 		)
-		return s.orders.To(socketio.Room(orderRoom(event.OrderID))).Emit(OrderAcceptedEvent, event)
+		return s.orders.To(socketio.Room(orderRoom(event.OrderID))).Emit(orderAcceptedEvent(), event)
 	})
 }
 
