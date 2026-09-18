@@ -9,7 +9,7 @@ import (
 	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
 	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
-	socketio "github.com/zishang520/socket.io/servers/socket/v3"
+	socket "github.com/zishang520/socket.io/servers/socket/v3"
 )
 
 func driversNamespace() string {
@@ -31,9 +31,9 @@ func orderAcceptedEvent() string {
 // Server is the mobile Socket.IO gateway. Kafka consumers emit durable ride
 // events through it; it does not make outbound HTTP webhook calls.
 type Server struct {
-	io      *socketio.Server
-	drivers socketio.Namespace
-	orders  socketio.Namespace
+	io      *socket.Server
+	drivers socket.Namespace
+	orders  socket.Namespace
 	tel     telemetry.Client
 }
 
@@ -41,12 +41,12 @@ type Server struct {
 // to /drivers; rider applications connect to /orders and subscribe to their
 // order room with the "order.subscribe" event.
 func NewServer(tel telemetry.Client) *Server {
-	io := socketio.NewServer(nil, nil)
+	io := socket.NewServer(nil, nil)
 	drivers := io.Of(driversNamespace(), nil)
 	orderClients := io.Of(ordersNamespace(), nil)
 
 	_ = orderClients.On("connection", func(args ...any) {
-		client, ok := args[0].(*socketio.Socket)
+		client, ok := args[0].(*socket.Socket)
 		if !ok {
 			return
 		}
@@ -58,7 +58,7 @@ func NewServer(tel telemetry.Client) *Server {
 			if !ok || strings.TrimSpace(orderID) == "" {
 				return
 			}
-			client.Join(socketio.Room(orderRoom(orderID)))
+			client.Join(socket.Room(orderRoom(orderID)))
 		})
 	})
 
@@ -87,7 +87,7 @@ func (s *Server) EmitRequested(event orders.OrderRequested) error {
 // EmitAccepted sends acceptance to the mobile client subscribed to this order.
 func (s *Server) EmitAccepted(event orders.OrderAccepted) error {
 	if s.tel == nil {
-		return s.orders.To(socketio.Room(orderRoom(event.OrderID))).Emit(orderAcceptedEvent(), event)
+		return s.orders.To(socket.Room(orderRoom(event.OrderID))).Emit(orderAcceptedEvent(), event)
 	}
 	return s.tel.WithSpan("socket.emit.order_accepted", func(ctx context.Context) error {
 		s.tel.Log().Info("socket.emit.order_accepted",
@@ -96,7 +96,7 @@ func (s *Server) EmitAccepted(event orders.OrderAccepted) error {
 			"event_id", event.EventID,
 			"event_version", event.EventVersion,
 		)
-		return s.orders.To(socketio.Room(orderRoom(event.OrderID))).Emit(orderAcceptedEvent(), event)
+		return s.orders.To(socket.Room(orderRoom(event.OrderID))).Emit(orderAcceptedEvent(), event)
 	})
 }
 
