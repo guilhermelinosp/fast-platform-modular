@@ -5,22 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 
 	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
+	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
 	"github.com/guilhermelinosp/hellnet-lib-kafka/kafka"
 )
 
 const (
-	consumerGroupEnv     = "HELLNET_KAFKA_MATCHING_CONSUMER_GROUP"
 	defaultConsumerGroup = "fast-matching"
 )
 
 func ConsumerGroup() string {
-	if group := os.Getenv(consumerGroupEnv); group != "" {
-		return group
-	}
-	return defaultConsumerGroup
+	return environments.GetString("HELLNET_KAFKA_", "", "MATCHING_CONSUMER_GROUP", "fast-matching")
 }
 
 type MatchService interface {

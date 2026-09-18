@@ -4,7 +4,6 @@ package sockets
 import (
 	"context"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
@@ -95,5 +94,3 @@ func (s *Server) EmitAccepted(event orders.OrderAccepted) error {
 }
 
 func orderRoom(orderID string) string { return "order:" + orderID }
-
-func envString(name string) string { return strings.TrimSpace(os.Getenv(name)) }

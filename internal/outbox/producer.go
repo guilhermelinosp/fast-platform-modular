@@ -33,13 +33,13 @@ func NewProducer(requested *kafka.Producer[orders.OrderRequested], accepted *kaf
 // Publish decodes and publishes a single outbox event to Kafka.
 func (p *Producer) Publish(event Event) error {
 	switch event.EventType {
-	case (orders.OrderRequested{}).MessageType(), "fast-order-requested.v1":
+	case (orders.OrderRequested{}).MessageType():
 		var message orders.OrderRequested
 		if err := json.Unmarshal(event.Payload, &message); err != nil {
 			return fmt.Errorf("decode order requested event: %w", err)
 		}
 		return p.requested.Publish(message)
-	case (orders.OrderAccepted{}).MessageType(), "fast-order-accepted.v1":
+	case (orders.OrderAccepted{}).MessageType():
 		var message orders.OrderAccepted
 		if err := json.Unmarshal(event.Payload, &message); err != nil {
 			return fmt.Errorf("decode order accepted event: %w", err)

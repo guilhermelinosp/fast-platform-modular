@@ -7,6 +7,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
 	"github.com/gorilla/websocket"
 )
 
@@ -54,7 +55,8 @@ func main() {
 }
 
 func connectSocket(logger *slog.Logger, path string) *websocket.Conn {
-	url := "ws://localhost:8080" + path + "?EIO=4&transport=websocket"
+	baseURL := environments.GetString("HELLNET_", "", "SOCKET_URL", "ws://localhost:8080")
+	url := baseURL + path + "?EIO=4&transport=websocket"
 	logger.Info("Connecting to WebSocket", "url", url)
 
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
@@ -75,7 +77,7 @@ func connectSocket(logger *slog.Logger, path string) *websocket.Conn {
 				}
 				return
 			}
-			logger.Debug("Received message", "message", string(msg))
+			logger.Info("Received message", "message", string(msg))
 		}
 	}()
 
