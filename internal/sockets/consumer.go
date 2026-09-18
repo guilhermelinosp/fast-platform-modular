@@ -5,31 +5,24 @@ import (
 	"fmt"
 
 	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
+	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
 	"github.com/guilhermelinosp/hellnet-lib-kafka/kafka"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 )
 
 const (
-	consumerGroupEnv             = "HELLNET_KAFKA_DRIVER_BFF_CONSUMER_GROUP"
 	defaultConsumerGroup         = "fast-driver-bff"
-	acceptedConsumerGroupEnv     = "HELLNET_KAFKA_DRIVER_BFF_ACCEPTED_CONSUMER_GROUP"
 	defaultAcceptedConsumerGroup = "fast-driver-bff-accepted"
 )
 
 // ConsumerGroup returns the dedicated group used by the driver BFF.
 func ConsumerGroup() string {
-	if group := envString(consumerGroupEnv); group != "" {
-		return group
-	}
-	return defaultConsumerGroup
+	return environments.GetString("HELLNET_KAFKA_", "", "DRIVER_BFF_CONSUMER_GROUP", "fast-driver-bff")
 }
 
 // AcceptedConsumerGroup returns the dedicated group used by the accepted BFF consumer.
 func AcceptedConsumerGroup() string {
-	if group := envString(acceptedConsumerGroupEnv); group != "" {
-		return group
-	}
-	return defaultAcceptedConsumerGroup
+	return environments.GetString("HELLNET_KAFKA_", "", "DRIVER_BFF_ACCEPTED_CONSUMER_GROUP", "fast-driver-bff-accepted")
 }
 
 // RequestedEmitter publishes requested orders to connected driver clients.
