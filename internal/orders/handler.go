@@ -1,4 +1,4 @@
-package rides
+package orders
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 // Handler exposes the rider HTTP routes.
 type Handler struct {
 	service interface {
-		Requested(context.Context, RequestedInput) (RideOutput, error)
+		Requested(context.Context, OrderRequestedInput) (OrderOutput, error)
 	}
 }
 
@@ -28,7 +28,7 @@ type requestInput struct {
 
 // NewHandler creates a rider HTTP handler.
 func NewHandler(service interface {
-	Requested(context.Context, RequestedInput) (RideOutput, error)
+	Requested(context.Context, OrderRequestedInput) (OrderOutput, error)
 }) *Handler {
 	return &Handler{service: service}
 }
@@ -36,7 +36,7 @@ func NewHandler(service interface {
 // Routes returns the rider routes.
 func (h *Handler) Routes() []api.Route {
 	return []api.Route{
-		{Method: http.MethodPost, Path: "/rides", Handler: api.HandlerFunc(h.request)},
+		{Method: http.MethodPost, Path: "/orders", Handler: api.HandlerFunc(h.request)},
 	}
 }
 
@@ -61,7 +61,7 @@ func (h *Handler) request(ctx context.Context, req api.Request) (api.Response, e
 	if _, err := uuid.Parse(riderID); err != nil {
 		return api.Response{}, errors.Validation("rider_id", "must be a UUID")
 	}
-	input := RequestedInput{
+	input := OrderRequestedInput{
 		ID:                   in.ID,
 		RiderID:              riderID,
 		PickupLatitude:       in.PickupLatitude,
@@ -69,9 +69,9 @@ func (h *Handler) request(ctx context.Context, req api.Request) (api.Response, e
 		DestinationLatitude:  in.DestinationLatitude,
 		DestinationLongitude: in.DestinationLongitude,
 	}
-	ride, err := h.service.Requested(ctx, input)
+	order, err := h.service.Requested(ctx, input)
 	if err != nil {
 		return api.Response{}, err
 	}
-	return api.JSON(http.StatusCreated, ride), nil
+	return api.JSON(http.StatusCreated, order), nil
 }

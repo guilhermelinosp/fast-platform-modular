@@ -28,14 +28,14 @@ func NewService(logger *slog.Logger, repository Repository) *Service {
 	return &Service{logger: logger, repository: repository}
 }
 
-// Match assigns the next available driver to a ride. It rejects non-UUID ride
+// Match assigns the next available driver to an order. It rejects non-UUID order
 // ids and propagates repository outcomes unchanged so consumers can decide
 // how to handle no-driver or already-matched cases.
-func (s *Service) Match(ctx context.Context, rideID string) (OfferOutput, error) {
-	if _, err := uuid.Parse(rideID); err != nil {
-		return OfferOutput{}, apierrors.Validation("ride_id", "must be a UUID")
+func (s *Service) Match(ctx context.Context, orderID string) (OfferOutput, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return OfferOutput{}, apierrors.Validation("order_id", "must be a UUID")
 	}
-	offer, err := s.repository.Match(ctx, rideID)
+	offer, err := s.repository.Match(ctx, orderID)
 	if err != nil {
 		return OfferOutput{}, err
 	}

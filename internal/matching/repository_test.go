@@ -44,18 +44,18 @@ func TestRepositoryMatchInsertsOffer(t *testing.T) {
 	tx := &fakeTx{driverID: "driver-1", found: true, rows: 1}
 	installFakeTx(t, tx)
 
-	offer, err := NewRepository(nil).Match(context.Background(), "ride-1")
+	offer, err := NewRepository(nil).Match(context.Background(), "order-1")
 	if err != nil {
 		t.Fatalf("Match() error = %v", err)
 	}
-	if offer.RideID != "ride-1" || offer.DriverID != "driver-1" || offer.Status != "pending" {
-		t.Fatalf("offer = %+v, want ride-1/driver-1/pending", offer)
+	if offer.OrderID != "order-1" || offer.DriverID != "driver-1" || offer.Status != "pending" {
+		t.Fatalf("offer = %+v, want order-1/driver-1/pending", offer)
 	}
 	if len(tx.stmts) != 1 {
 		t.Fatalf("statements = %d, want 1 (offer insert)", len(tx.stmts))
 	}
-	if tx.args[0][0] != "ride-1" || tx.args[0][1] != "driver-1" {
-		t.Fatalf("insert args = %v, want (ride-1, driver-1)", tx.args[0])
+	if tx.args[0][0] != "order-1" || tx.args[0][1] != "driver-1" {
+		t.Fatalf("insert args = %v, want (order-1, driver-1)", tx.args[0])
 	}
 }
 
@@ -63,7 +63,7 @@ func TestRepositoryMatchNoDriver(t *testing.T) {
 	tx := &fakeTx{found: false}
 	installFakeTx(t, tx)
 
-	_, err := NewRepository(nil).Match(context.Background(), "ride-1")
+	_, err := NewRepository(nil).Match(context.Background(), "order-1")
 	if !errors.Is(err, ErrNoDriverAvailable) {
 		t.Fatalf("error = %v, want ErrNoDriverAvailable", err)
 	}
@@ -76,7 +76,7 @@ func TestRepositoryMatchAlreadyMatched(t *testing.T) {
 	tx := &fakeTx{driverID: "driver-1", found: true, rows: 0}
 	installFakeTx(t, tx)
 
-	_, err := NewRepository(nil).Match(context.Background(), "ride-1")
+	_, err := NewRepository(nil).Match(context.Background(), "order-1")
 	if !errors.Is(err, ErrRideAlreadyMatched) {
 		t.Fatalf("error = %v, want ErrRideAlreadyMatched", err)
 	}
@@ -87,7 +87,7 @@ func TestRepositoryMatchDriverQueryError(t *testing.T) {
 	tx := &fakeTx{driverErr: wantErr}
 	installFakeTx(t, tx)
 
-	_, err := NewRepository(nil).Match(context.Background(), "ride-1")
+	_, err := NewRepository(nil).Match(context.Background(), "order-1")
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("error = %v, want %v", err, wantErr)
 	}
@@ -98,7 +98,7 @@ func TestRepositoryMatchInsertError(t *testing.T) {
 	tx := &fakeTx{driverID: "driver-1", found: true, rowsErr: wantErr}
 	installFakeTx(t, tx)
 
-	_, err := NewRepository(nil).Match(context.Background(), "ride-1")
+	_, err := NewRepository(nil).Match(context.Background(), "order-1")
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("error = %v, want %v", err, wantErr)
 	}

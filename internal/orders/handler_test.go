@@ -1,4 +1,4 @@
-package rides
+package orders
 
 import (
 	"bytes"
@@ -16,12 +16,12 @@ import (
 
 type fakeService struct {
 	calls int
-	input RequestedInput
-	out   RideOutput
+	input OrderRequestedInput
+	out   OrderOutput
 	err   error
 }
 
-func (f *fakeService) Requested(_ context.Context, input RequestedInput) (RideOutput, error) {
+func (f *fakeService) Requested(_ context.Context, input OrderRequestedInput) (OrderOutput, error) {
 	f.calls++
 	f.input = input
 	return f.out, f.err
@@ -43,7 +43,7 @@ func (r *fakeRequest) Raw() *http.Request       { return nil }
 func TestHandlerRequestSuccess(t *testing.T) {
 	const id = "00000000-0000-0000-0000-000000000001"
 	const riderID = "00000000-0000-0000-0000-000000000002"
-	service := &fakeService{out: RideOutput{ID: id, RiderID: riderID}}
+	service := &fakeService{out: OrderOutput{ID: id, RiderID: riderID}}
 	handler := NewHandler(service)
 	req := &fakeRequest{body: []byte(`{"id":"` + id + `","rider_id":"` + riderID + `","pickup_latitude":-23.56}`)}
 
@@ -54,7 +54,7 @@ func TestHandlerRequestSuccess(t *testing.T) {
 	if response.Status != http.StatusCreated {
 		t.Fatalf("status = %d, want 201", response.Status)
 	}
-	if got := response.Body.(RideOutput); got.ID != id {
+	if got := response.Body.(OrderOutput); got.ID != id {
 		t.Fatalf("body = %+v, want ride with id %q", got, id)
 	}
 	if service.calls != 1 || service.input.ID != id || service.input.RiderID != riderID {

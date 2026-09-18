@@ -2,22 +2,24 @@
 package sockets
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"strings"
 
-	"github.com/guilhermelinosp/fast-platform-modular/internal/rides"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
+	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 	socketio "github.com/zishang520/socket.io/servers/socket/v3"
 )
 
 const (
 	driversNamespace = "/drivers"
-	ridesNamespace   = "/rides"
+	ordersNamespace  = "/orders"
 
-	// RideRequestedEvent is emitted to driver clients when a ride is requested.
-	RideRequestedEvent = "ride.requested"
-	// RideAcceptedEvent is emitted to the rider client when a ride is accepted.
-	RideAcceptedEvent = "ride.accepted"
+	// OrderRequestedEvent is emitted to driver clients when an order is requested.
+	OrderRequestedEvent = "order.requested"
+	// OrderAcceptedEvent is emitted to the rider client when an order is accepted.
+	OrderAcceptedEvent = "order.accepted"
 )
 
 // Server is the mobile Socket.IO gateway. Kafka consumers emit durable ride
@@ -25,50 +27,73 @@ const (
 type Server struct {
 	io      *socketio.Server
 	drivers socketio.Namespace
-	rides   socketio.Namespace
+	orders  socketio.Namespace
+	tel     telemetry.Client
 }
 
 // NewServer creates a Socket.IO v4+ server. Mobile driver applications connect
-// to /drivers; rider applications connect to /rides and subscribe to their
-// ride room with the "ride.subscribe" event.
-func NewServer() *Server {
+// to /drivers; rider applications connect to /orders and subscribe to their
+// order room with the "order.subscribe" event.
+func NewServer(tel telemetry.Client) *Server {
 	io := socketio.NewServer(nil, nil)
 	drivers := io.Of(driversNamespace, nil)
-	rideClients := io.Of(ridesNamespace, nil)
+	orderClients := io.Of(ordersNamespace, nil)
 
-	_ = rideClients.On("connection", func(args ...any) {
+	_ = orderClients.On("connection", func(args ...any) {
 		client, ok := args[0].(*socketio.Socket)
 		if !ok {
 			return
 		}
-		_ = client.On("ride.subscribe", func(values ...any) {
+		_ = client.On("order.subscribe", func(values ...any) {
 			if len(values) != 1 {
 				return
 			}
-			rideID, ok := values[0].(string)
-			if !ok || strings.TrimSpace(rideID) == "" {
+			orderID, ok := values[0].(string)
+			if !ok || strings.TrimSpace(orderID) == "" {
 				return
 			}
-			client.Join(socketio.Room(rideRoom(rideID)))
+			client.Join(socketio.Room(orderRoom(orderID)))
 		})
 	})
 
-	return &Server{io: io, drivers: drivers, rides: rideClients}
+	return &Server{io: io, drivers: drivers, orders: orderClients, tel: tel}
 }
 
 // Handler serves the Socket.IO Engine.IO endpoint at /socket.io/.
 func (s *Server) Handler() http.Handler { return s.io.ServeHandler(nil) }
 
-// EmitRequested broadcasts a ride request to connected driver applications.
-func (s *Server) EmitRequested(event rides.Requested) error {
-	return s.drivers.Emit(RideRequestedEvent, event)
+// EmitRequested broadcasts an order request to connected driver applications.
+func (s *Server) EmitRequested(event orders.OrderRequested) error {
+	if s.tel == nil {
+		return s.drivers.Emit(OrderRequestedEvent, event)
+	}
+	return s.tel.WithSpan("socket.emit.order_requested", func(ctx context.Context) error {
+		s.tel.Log().Info("socket.emit.order_requested",
+			"order_id", event.OrderID,
+			"rider_id", event.RiderID,
+			"event_id", event.EventID,
+			"event_version", event.EventVersion,
+		)
+		return s.drivers.Emit(OrderRequestedEvent, event)
+	})
 }
 
-// EmitAccepted sends acceptance to the mobile client subscribed to this ride.
-func (s *Server) EmitAccepted(event rides.Accepted) error {
-	return s.rides.To(socketio.Room(rideRoom(event.RideID))).Emit(RideAcceptedEvent, event)
+// EmitAccepted sends acceptance to the mobile client subscribed to this order.
+func (s *Server) EmitAccepted(event orders.OrderAccepted) error {
+	if s.tel == nil {
+		return s.orders.To(socketio.Room(orderRoom(event.OrderID))).Emit(OrderAcceptedEvent, event)
+	}
+	return s.tel.WithSpan("socket.emit.order_accepted", func(ctx context.Context) error {
+		s.tel.Log().Info("socket.emit.order_accepted",
+			"order_id", event.OrderID,
+			"driver_id", event.DriverID,
+			"event_id", event.EventID,
+			"event_version", event.EventVersion,
+		)
+		return s.orders.To(socketio.Room(orderRoom(event.OrderID))).Emit(OrderAcceptedEvent, event)
+	})
 }
 
-func rideRoom(rideID string) string { return "ride:" + rideID }
+func orderRoom(orderID string) string { return "order:" + orderID }
 
 func envString(name string) string { return strings.TrimSpace(os.Getenv(name)) }

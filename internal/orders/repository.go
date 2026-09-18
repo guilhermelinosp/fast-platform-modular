@@ -1,4 +1,4 @@
-package rides
+package orders
 
 import (
 	"context"
@@ -27,12 +27,12 @@ func NewRepository(db *database.DB) *Database {
 }
 
 // Requested persists a requested ride and its outbox event.
-func (r *Database) Requested(ctx context.Context, input RequestedInput) (Ride, error) {
+func (r *Database) Requested(ctx context.Context, input OrderRequestedInput) (Order, error) {
 	_ = ctx
-	var ride Ride
+	var order Order
 	err := transactional(r.db, func(execute execFn) error {
 		if _, err := execute(
-			"INSERT INTO rides (id, rider_id, pickup_latitude, pickup_longitude, destination_latitude, destination_longitude) VALUES ($1, $2, $3, $4, $5, $6)",
+			"INSERT INTO orders (id, rider_id, pickup_latitude, pickup_longitude, destination_latitude, destination_longitude) VALUES ($1, $2, $3, $4, $5, $6)",
 			input.ID,
 			input.RiderID,
 			input.PickupLatitude,
@@ -43,21 +43,21 @@ func (r *Database) Requested(ctx context.Context, input RequestedInput) (Ride, e
 		}
 
 		if _, err := execute(
-			"INSERT INTO ride_status_history (id,ride_id,sequence,status_id) VALUES ($1, $2, 1, 1)",
+			"INSERT INTO order_status_history (id, order_id, sequence, status_id) VALUES ($1, $2, 1, 1)",
 			input.StatusHistoryID,
 			input.ID); err != nil {
 			return err
 		}
 
 		if _, err := execute(
-			"INSERT INTO outbox_events (id,aggregate_type,aggregate_id,event_type,event_version, payload) VALUES ($1, 'ride', $2, $4, 1, $3::jsonb)",
+			"INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, event_version, payload) VALUES ($1, 'order', $2, $4, 1, $3::jsonb)",
 			input.OutboxID,
 			input.ID,
 			input.Payload, input.EventType); err != nil {
 			return err
 		}
 
-		ride = Ride{
+		order = Order{
 			ID:                   input.ID,
 			RiderID:              input.RiderID,
 			PickupLatitude:       input.PickupLatitude,
@@ -68,5 +68,5 @@ func (r *Database) Requested(ctx context.Context, input RequestedInput) (Ride, e
 
 		return nil
 	})
-	return ride, err
+	return order, err
 }

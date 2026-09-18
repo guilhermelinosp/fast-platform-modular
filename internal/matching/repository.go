@@ -68,10 +68,10 @@ type Database struct{ db *database.DB }
 // NewRepository creates a matching repository.
 func NewRepository(db *database.DB) *Database { return &Database{db: db} }
 
-// Match assigns an available driver to a ride, recording the offer. Matching
-// is idempotent: a ride with an existing offer is reported via
+// Match assigns an available driver to an order, recording the offer. Matching
+// is idempotent: an order with an existing offer is reported via
 // ErrRideAlreadyMatched without inserting a duplicate.
-func (r *Database) Match(ctx context.Context, rideID string) (Offer, error) {
+func (r *Database) Match(ctx context.Context, orderID string) (Offer, error) {
 	_ = ctx
 	var offer Offer
 	err := transactional(r.db, func(execute execFn, driver driverFn) error {
@@ -82,14 +82,14 @@ func (r *Database) Match(ctx context.Context, rideID string) (Offer, error) {
 		if !found {
 			return ErrNoDriverAvailable
 		}
-		n, err := execute(insertOfferSQL, rideID, driverID)
+		n, err := execute(insertOfferSQL, orderID, driverID)
 		if err != nil {
 			return err
 		}
 		if n == 0 {
 			return ErrRideAlreadyMatched
 		}
-		offer = Offer{RideID: rideID, DriverID: driverID, Status: "pending"}
+		offer = Offer{OrderID: orderID, DriverID: driverID, Status: "pending"}
 		return nil
 	})
 	return offer, err

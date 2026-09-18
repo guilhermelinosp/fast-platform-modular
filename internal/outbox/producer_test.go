@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/guilhermelinosp/fast-platform-modular/internal/rides"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
 )
 
 func TestOutboxMemoStartClaimsOnce(t *testing.T) {
@@ -124,8 +124,8 @@ func TestProducerPublishRejectsMalformedPayload(t *testing.T) {
 		eventType string
 		want      string
 	}{
-		{name: "requested", eventType: (rides.Requested{}).MessageType(), want: "decode requested event"},
-		{name: "accepted", eventType: (rides.Accepted{}).MessageType(), want: "decode accepted event"},
+		{name: "requested", eventType: (orders.OrderRequested{}).MessageType(), want: "unexpected end of JSON input"},
+		{name: "accepted", eventType: (orders.OrderAccepted{}).MessageType(), want: "unexpected end of JSON input"},
 	}
 
 	for _, tt := range tests {
@@ -182,14 +182,14 @@ func (f *fakeStore) RecordFailure(id string, reason string) error {
 	return f.auditErr
 }
 
-type fakeRequestedPublisher struct {
+type fakeOrderRequestedPublisher struct {
 	mu    sync.Mutex
 	calls int
-	last  rides.Requested
+	last  orders.OrderRequested
 	err   error
 }
 
-func (f *fakeRequestedPublisher) Publish(m rides.Requested) error {
+func (f *fakeOrderRequestedPublisher) Publish(m orders.OrderRequested) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls++
@@ -197,20 +197,20 @@ func (f *fakeRequestedPublisher) Publish(m rides.Requested) error {
 	return f.err
 }
 
-func (f *fakeRequestedPublisher) snapshot() (int, rides.Requested) {
+func (f *fakeOrderRequestedPublisher) snapshot() (int, orders.OrderRequested) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.calls, f.last
 }
 
-type fakeAcceptedPublisher struct {
+type fakeOrderAcceptedPublisher struct {
 	mu    sync.Mutex
 	calls int
-	last  rides.Accepted
+	last  orders.OrderAccepted
 	err   error
 }
 
-func (f *fakeAcceptedPublisher) Publish(m rides.Accepted) error {
+func (f *fakeOrderAcceptedPublisher) Publish(m orders.OrderAccepted) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls++
@@ -224,6 +224,7 @@ func newTestListener(store outboxStore, publisher eventPublisher) *Listener {
 		publisher: publisher,
 		stopScan:  make(chan struct{}),
 		memo:      newOutboxMemo(),
+		tel:       nil, // nil telemetry client for tests
 	}
 }
 
@@ -241,12 +242,12 @@ func mustMarshal(t *testing.T, v any) []byte {
 func TestListenerReconcileOncePublishesPending(t *testing.T) {
 	store := &fakeStore{
 		rows: []Event{
-			{ID: "event-1", EventType: (rides.Requested{}).MessageType(), Payload: mustMarshal(t, rides.Requested{EventID: "event-1"})},
-			{ID: "event-2", EventType: (rides.Accepted{}).MessageType(), Payload: mustMarshal(t, rides.Accepted{EventID: "event-2"})},
+			{ID: "event-1", EventType: (orders.OrderRequested{}).MessageType(), Payload: mustMarshal(t, orders.OrderRequested{EventID: "event-1"})},
+			{ID: "event-2", EventType: (orders.OrderAccepted{}).MessageType(), Payload: mustMarshal(t, orders.OrderAccepted{EventID: "event-2"})},
 		},
 	}
-	requested := &fakeRequestedPublisher{}
-	accepted := &fakeAcceptedPublisher{}
+	requested := &fakeOrderRequestedPublisher{}
+	accepted := &fakeOrderAcceptedPublisher{}
 	producer := &Producer{requested: requested, accepted: accepted}
 	listener := newTestListener(store, producer)
 
@@ -265,8 +266,8 @@ func TestListenerReconcileOncePublishesPending(t *testing.T) {
 
 func TestListenerReconcileOnceQueryErrorSkipsPublish(t *testing.T) {
 	store := &fakeStore{pendingErr: errors.New("db down")}
-	requested := &fakeRequestedPublisher{}
-	accepted := &fakeAcceptedPublisher{}
+	requested := &fakeOrderRequestedPublisher{}
+	accepted := &fakeOrderAcceptedPublisher{}
 	producer := &Producer{requested: requested, accepted: accepted}
 	listener := newTestListener(store, producer)
 
@@ -283,11 +284,11 @@ func TestListenerReconcileOnceQueryErrorSkipsPublish(t *testing.T) {
 func TestListenerReconcileOnceSkipsSettledEvents(t *testing.T) {
 	store := &fakeStore{
 		rows: []Event{
-			{ID: "event-1", EventType: (rides.Requested{}).MessageType(), Payload: mustMarshal(t, rides.Requested{EventID: "event-1"})},
+			{ID: "event-1", EventType: (orders.OrderRequested{}).MessageType(), Payload: mustMarshal(t, orders.OrderRequested{EventID: "event-1"})},
 		},
 	}
-	requested := &fakeRequestedPublisher{}
-	accepted := &fakeAcceptedPublisher{}
+	requested := &fakeOrderRequestedPublisher{}
+	accepted := &fakeOrderAcceptedPublisher{}
 	producer := &Producer{requested: requested, accepted: accepted}
 	listener := newTestListener(store, producer)
 
@@ -305,11 +306,11 @@ func TestListenerReconcileOnceSkipsSettledEvents(t *testing.T) {
 func TestListenerReconcileOnceRetriesAfterPublishFailure(t *testing.T) {
 	store := &fakeStore{
 		rows: []Event{
-			{ID: "event-1", EventType: (rides.Requested{}).MessageType(), Payload: mustMarshal(t, rides.Requested{EventID: "event-1"})},
+			{ID: "event-1", EventType: (orders.OrderRequested{}).MessageType(), Payload: mustMarshal(t, orders.OrderRequested{EventID: "event-1"})},
 		},
 	}
-	requested := &fakeRequestedPublisher{err: errors.New("kafka down")}
-	accepted := &fakeAcceptedPublisher{}
+	requested := &fakeOrderRequestedPublisher{err: errors.New("kafka down")}
+	accepted := &fakeOrderAcceptedPublisher{}
 	producer := &Producer{requested: requested, accepted: accepted}
 	listener := newTestListener(store, producer)
 
@@ -327,11 +328,11 @@ func TestListenerReconcileOnceRetriesAfterPublishFailure(t *testing.T) {
 
 func TestListenerOnNotificationDispatchesPublish(t *testing.T) {
 	store := &fakeStore{
-		row:      Event{ID: "event-1", EventType: (rides.Requested{}).MessageType(), Payload: mustMarshal(t, rides.Requested{EventID: "event-1"})},
+		row:      Event{ID: "event-1", EventType: (orders.OrderRequested{}).MessageType(), Payload: mustMarshal(t, orders.OrderRequested{EventID: "event-1"})},
 		rowFound: true,
 	}
-	requested := &fakeRequestedPublisher{}
-	accepted := &fakeAcceptedPublisher{}
+	requested := &fakeOrderRequestedPublisher{}
+	accepted := &fakeOrderAcceptedPublisher{}
 	producer := &Producer{requested: requested, accepted: accepted}
 	listener := newTestListener(store, producer)
 
@@ -355,8 +356,8 @@ func TestListenerOnNotificationDispatchesPublish(t *testing.T) {
 
 func TestListenerCloseIsIdempotent(t *testing.T) {
 	store := &fakeStore{}
-	requested := &fakeRequestedPublisher{}
-	accepted := &fakeAcceptedPublisher{}
+	requested := &fakeOrderRequestedPublisher{}
+	accepted := &fakeOrderAcceptedPublisher{}
 	producer := &Producer{requested: requested, accepted: accepted}
 	listener := newTestListener(store, producer)
 
