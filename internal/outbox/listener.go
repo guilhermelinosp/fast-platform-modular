@@ -1,11 +1,12 @@
 package outbox
 
 import (
-	"log/slog"
+	"context"
 	"sync"
 	"time"
 
 	"github.com/guilhermelinosp/hellnet-lib-database/database"
+	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 )
 
 // outboxStore reads pending outbox rows and records publication audit rows.
@@ -118,10 +119,11 @@ type Listener struct {
 	workers      sync.WaitGroup
 	closeOnce    sync.Once
 	memo         *outboxMemo
+	tel          telemetry.Client
 }
 
 // NewListener starts a PostgreSQL listener for outbox events.
-func NewListener(db *database.DB, publisher eventPublisher) (*Listener, error) {
+func NewListener(db *database.DB, publisher eventPublisher, tel telemetry.Client) (*Listener, error) {
 	conn, err := db.Acquire()
 	if err != nil {
 		return nil, err
@@ -132,6 +134,7 @@ func NewListener(db *database.DB, publisher eventPublisher) (*Listener, error) {
 		listenerConn: conn,
 		stopScan:     make(chan struct{}),
 		memo:         newOutboxMemo(),
+		tel:          tel,
 	}
 	stop, err := conn.ListenWithReconnect(outboxChannel, l.onNotification, database.ListenOptions{})
 	if err != nil {
@@ -152,7 +155,8 @@ func (l *Listener) onNotification(id string) {
 		event, found, err := l.store.QueryRow(id)
 		if err != nil {
 			l.memo.release(id)
-			slog.Default().Error("outbox select failed", "error", err, "event_id", id)
+			l.logError("outbox select failed", "error", err, "event_id", id)
+			l.incrementCounter("outbox.select.errors.total")
 			return
 		}
 		if !found {
@@ -161,17 +165,33 @@ func (l *Listener) onNotification(id string) {
 		}
 		if err := l.publisher.Publish(event); err != nil {
 			if auditErr := l.store.RecordFailure(id, err.Error()); auditErr != nil {
-				slog.Default().Error("outbox failure audit insert failed", "error", auditErr, "event_id", id)
+				l.logError("outbox failure audit insert failed", "error", auditErr, "event_id", id)
 			}
 			l.memo.release(id)
-			slog.Default().Error("outbox publish failed; will retry on next reconcile", "error", err, "event_id", id)
+			l.logError("outbox publish failed; will retry on next reconcile", "error", err, "event_id", id)
+			l.incrementCounter("outbox.publish.errors.total")
 			return
 		}
 		if auditErr := l.store.RecordPublished(id); auditErr != nil {
-			slog.Default().Error("outbox publication audit insert failed", "error", auditErr, "event_id", id)
+			l.logError("outbox publication audit insert failed", "error", auditErr, "event_id", id)
 		}
 		l.memo.settle(id)
+		l.incrementCounter("outbox.events.published.total")
 	})
+}
+
+func (l *Listener) logError(msg string, args ...any) {
+	if l.tel != nil {
+		l.tel.Log().Error(msg, args...)
+	}
+}
+
+func (l *Listener) incrementCounter(name string) {
+	if l.tel != nil {
+		if c, err := l.tel.Metric().Counter(name); err == nil {
+			c.Add(context.Background(), 1)
+		}
+	}
 }
 
 func (l *Listener) reconcileLoop() {
@@ -191,7 +211,8 @@ func (l *Listener) reconcileLoop() {
 func (l *Listener) reconcileOnce() {
 	events, err := l.store.QueryPending()
 	if err != nil {
-		slog.Default().Error("outbox reconciliation failed", "error", err)
+		l.logError("outbox reconciliation failed", "error", err)
+		l.incrementCounter("outbox.reconcile.errors.total")
 		return
 	}
 	for _, event := range events {
@@ -200,16 +221,18 @@ func (l *Listener) reconcileOnce() {
 		}
 		if err := l.publisher.Publish(event); err != nil {
 			if auditErr := l.store.RecordFailure(event.ID, err.Error()); auditErr != nil {
-				slog.Default().Error("outbox failure audit insert failed", "error", auditErr, "event_id", event.ID)
+				l.logError("outbox failure audit insert failed", "error", auditErr, "event_id", event.ID)
 			}
 			l.memo.release(event.ID)
-			slog.Default().Error("outbox publish failed; will retry on next reconcile", "error", err, "event_id", event.ID)
+			l.logError("outbox publish failed; will retry on next reconcile", "error", err, "event_id", event.ID)
+			l.incrementCounter("outbox.publish.errors.total")
 			continue
 		}
 		if auditErr := l.store.RecordPublished(event.ID); auditErr != nil {
-			slog.Default().Error("outbox publication audit insert failed", "error", auditErr, "event_id", event.ID)
+			l.logError("outbox publication audit insert failed", "error", auditErr, "event_id", event.ID)
 		}
 		l.memo.settle(event.ID)
+		l.incrementCounter("outbox.events.published.total")
 	}
 }
 
@@ -218,7 +241,9 @@ func (l *Listener) Close() {
 	l.closeOnce.Do(func() {
 		if l.stopListen != nil {
 			if err := l.stopListen(); err != nil {
-				slog.Default().Warn("stop outbox listener failed", "error", err)
+				if l.tel != nil {
+					l.tel.Log().Warn("stop outbox listener failed", "error", err)
+				}
 			}
 		}
 		close(l.stopScan)

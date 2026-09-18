@@ -1,4 +1,4 @@
-package rides
+package orders
 
 import (
 	"bytes"
@@ -43,12 +43,12 @@ func installFakeTx(t *testing.T, tx *fakeTx) {
 	t.Cleanup(func() { transactional = orig })
 }
 
-func TestRepositoryRequestedInsertsRideHistoryOutboxInOrder(t *testing.T) {
+func TestRepositoryRequestedInsertsOrderHistoryOutboxInOrder(t *testing.T) {
 	tx := &fakeTx{}
 	installFakeTx(t, tx)
 
-	input := RequestedInput{
-		ID:                   "ride-1",
+	input := OrderRequestedInput{
+		ID:                   "order-1",
 		RiderID:              "rider-1",
 		PickupLatitude:       1.1,
 		PickupLongitude:      2.2,
@@ -57,7 +57,7 @@ func TestRepositoryRequestedInsertsRideHistoryOutboxInOrder(t *testing.T) {
 		StatusHistoryID:      "status-1",
 		OutboxID:             "outbox-1",
 		Payload:              []byte(`{"eventId":"outbox-1"}`),
-		EventType:            "fast.ride.requested.v1",
+		EventType:            "fast.order.requested.v1",
 	}
 
 	got, err := NewRepository(nil).Requested(context.Background(), input)
@@ -69,8 +69,8 @@ func TestRepositoryRequestedInsertsRideHistoryOutboxInOrder(t *testing.T) {
 		t.Fatalf("statements = %d, want 3: %q", len(tx.stmts), tx.stmts)
 	}
 	wantSQL := []string{
-		"INSERT INTO rides",
-		"INSERT INTO ride_status_history",
+		"INSERT INTO orders",
+		"INSERT INTO order_status_history",
 		"INSERT INTO outbox_events",
 	}
 	for i, want := range wantSQL {
@@ -80,23 +80,23 @@ func TestRepositoryRequestedInsertsRideHistoryOutboxInOrder(t *testing.T) {
 	}
 
 	// First statement arguments: id, rider_id, pickup lat/lon, dest lat/lon.
-	rideArgs := tx.args[0]
-	wantRideArgs := []any{input.ID, input.RiderID, input.PickupLatitude, input.PickupLongitude, input.DestinationLatitude, input.DestinationLongitude}
-	if len(rideArgs) != len(wantRideArgs) {
-		t.Fatalf("ride args = %v, want %v", rideArgs, wantRideArgs)
+	orderArgs := tx.args[0]
+	wantOrderArgs := []any{input.ID, input.RiderID, input.PickupLatitude, input.PickupLongitude, input.DestinationLatitude, input.DestinationLongitude}
+	if len(orderArgs) != len(wantOrderArgs) {
+		t.Fatalf("order args = %v, want %v", orderArgs, wantOrderArgs)
 	}
-	for i := range wantRideArgs {
-		if rideArgs[i] != wantRideArgs[i] {
-			t.Errorf("ride arg[%d] = %v, want %v", i, rideArgs[i], wantRideArgs[i])
+	for i := range wantOrderArgs {
+		if orderArgs[i] != wantOrderArgs[i] {
+			t.Errorf("order arg[%d] = %v, want %v", i, orderArgs[i], wantOrderArgs[i])
 		}
 	}
 
-	// Second statement: status history id + ride id.
+	// Second statement: status history id + order id.
 	if len(tx.args[1]) != 2 || tx.args[1][0] != input.StatusHistoryID || tx.args[1][1] != input.ID {
 		t.Errorf("status history args = %v, want [%q %q]", tx.args[1], input.StatusHistoryID, input.ID)
 	}
 
-	// Third statement: outbox id, ride id, payload, event type.
+	// Third statement: outbox id, order id, payload, event type.
 	outArgs := tx.args[2]
 	if len(outArgs) != 4 || outArgs[0] != input.OutboxID || outArgs[1] != input.ID {
 		t.Errorf("outbox args = %v, want [%q %q ...]", outArgs, input.OutboxID, input.ID)
@@ -114,12 +114,12 @@ func TestRepositoryRequestedInsertsRideHistoryOutboxInOrder(t *testing.T) {
 	}
 }
 
-func TestRepositoryRequestedFailsOnRideInsert(t *testing.T) {
-	wantErr := errors.New("insert rides failed")
+func TestRepositoryRequestedFailsOnOrderInsert(t *testing.T) {
+	wantErr := errors.New("insert orders failed")
 	tx := &fakeTx{failAt: 0, failErr: wantErr}
 	installFakeTx(t, tx)
 
-	_, err := NewRepository(nil).Requested(context.Background(), RequestedInput{ID: "ride-1", RiderID: "rider-1"})
+	_, err := NewRepository(nil).Requested(context.Background(), OrderRequestedInput{ID: "order-1", RiderID: "rider-1"})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("error = %v, want %v", err, wantErr)
 	}
@@ -133,12 +133,12 @@ func TestRepositoryRequestedFailsOnStatusHistoryInsert(t *testing.T) {
 	tx := &fakeTx{failAt: 1, failErr: wantErr}
 	installFakeTx(t, tx)
 
-	_, err := NewRepository(nil).Requested(context.Background(), RequestedInput{ID: "ride-1", RiderID: "rider-1"})
+	_, err := NewRepository(nil).Requested(context.Background(), OrderRequestedInput{ID: "order-1", RiderID: "rider-1"})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("error = %v, want %v", err, wantErr)
 	}
 	if len(tx.stmts) != 2 {
-		t.Errorf("statements = %d, want 2 (ride succeeded, status failed)", len(tx.stmts))
+		t.Errorf("statements = %d, want 2 (order succeeded, status failed)", len(tx.stmts))
 	}
 }
 
@@ -147,7 +147,7 @@ func TestRepositoryRequestedFailsOnOutboxInsert(t *testing.T) {
 	tx := &fakeTx{failAt: 2, failErr: wantErr}
 	installFakeTx(t, tx)
 
-	_, err := NewRepository(nil).Requested(context.Background(), RequestedInput{ID: "ride-1", RiderID: "rider-1"})
+	_, err := NewRepository(nil).Requested(context.Background(), OrderRequestedInput{ID: "order-1", RiderID: "rider-1"})
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("error = %v, want %v", err, wantErr)
 	}

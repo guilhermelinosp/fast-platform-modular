@@ -1,15 +1,15 @@
-// Package matching implements the ride-to-driver matching consumer. It owns
+// Package matching implements the order-to-driver matching consumer. It owns
 // the dedicated "fast-matching" consumer group: it selects an available driver
-// for each requested ride and records an offer so the driver BFF can accept
+// for each requested order and records an offer so the driver BFF can accept
 // it. Persisting offers in PostgreSQL keeps matching consistent with the
-// acceptance guard (the same ride_acceptances flow) and survives consumer
+// acceptance guard (the same order_acceptances flow) and survives consumer
 // restarts.
 package matching
 
-// Offer is a driver assigned to a ride by the matching consumer.
+// Offer is a driver assigned to an order by the matching consumer.
 type Offer struct {
 	ID       string
-	RideID   string
+	OrderID  string
 	DriverID string
 	Status   string
 }
@@ -17,7 +17,7 @@ type Offer struct {
 // OfferOutput is the public offer representation.
 type OfferOutput struct {
 	ID       string `json:"id"`
-	RideID   string `json:"ride_id"`
+	OrderID  string `json:"order_id"`
 	DriverID string `json:"driver_id"`
 	Status   string `json:"status"`
 }

@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/guilhermelinosp/fast-platform-modular/internal/rides"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
 	"github.com/guilhermelinosp/hellnet-lib-kafka/kafka"
+	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 )
 
 const (
@@ -31,31 +32,43 @@ func AcceptedConsumerGroup() string {
 	return defaultAcceptedConsumerGroup
 }
 
-// RequestedEmitter publishes requested rides to connected driver clients.
-type RequestedEmitter interface{ EmitRequested(rides.Requested) error }
+// RequestedEmitter publishes requested orders to connected driver clients.
+type RequestedEmitter interface {
+	EmitRequested(orders.OrderRequested) error
+}
 
-// AcceptedEmitter publishes accepted rides to the subscribed rider client.
-type AcceptedEmitter interface{ EmitAccepted(rides.Accepted) error }
+// AcceptedEmitter publishes accepted orders to the subscribed rider client.
+type AcceptedEmitter interface {
+	EmitAccepted(orders.OrderAccepted) error
+}
 
-// NewConsumer consumes the ride-requested topic and emits each event to the
+// NewOrderRequestConsumer consumes the order-requested topic and emits each event to the
 // driver Socket.IO namespace.
-func NewConsumer(emitter RequestedEmitter) (*kafka.Consumer[rides.Requested], error) {
+func NewOrderRequestConsumer(tel telemetry.Client, emitter RequestedEmitter) (*kafka.Consumer[orders.OrderRequested], error) {
 	if emitter == nil {
 		return nil, fmt.Errorf("sockets: requested emitter is nil")
 	}
-	var handler kafka.HandlerFunc[rides.Requested] = func(ctx context.Context, event rides.Requested, _ kafka.Ctx) error {
+	var handler kafka.HandlerFunc[orders.OrderRequested] = func(ctx context.Context, event orders.OrderRequested, _ kafka.Ctx) error {
+		tel.Log().Info("kafka.consume.order_requested", "order_id", event.OrderID, "event_id", event.EventID)
+		if c, err := tel.Metric().Counter("socket.kafka.consume.order_requested.total"); err == nil {
+			c.Add(ctx, 1)
+		}
 		return emitter.EmitRequested(event)
 	}
 	return kafka.NewConsumer(handler, kafka.HandlerSpec{Group: ConsumerGroup()})
 }
 
-// NewAcceptedConsumer consumes the ride-accepted topic and emits each event to
-// its Socket.IO ride room.
-func NewAcceptedConsumer(emitter AcceptedEmitter) (*kafka.Consumer[rides.Accepted], error) {
+// NewOrderAcceptedConsumer consumes the order-accepted topic and emits each event to
+// its Socket.IO order room.
+func NewOrderAcceptedConsumer(tel telemetry.Client, emitter AcceptedEmitter) (*kafka.Consumer[orders.OrderAccepted], error) {
 	if emitter == nil {
 		return nil, fmt.Errorf("sockets: accepted emitter is nil")
 	}
-	var handler kafka.HandlerFunc[rides.Accepted] = func(ctx context.Context, event rides.Accepted, _ kafka.Ctx) error {
+	var handler kafka.HandlerFunc[orders.OrderAccepted] = func(ctx context.Context, event orders.OrderAccepted, _ kafka.Ctx) error {
+		tel.Log().Info("kafka.consume.order_accepted", "order_id", event.OrderID, "driver_id", event.DriverID, "event_id", event.EventID)
+		if c, err := tel.Metric().Counter("socket.kafka.consume.order_accepted.total"); err == nil {
+			c.Add(ctx, 1)
+		}
 		return emitter.EmitAccepted(event)
 	}
 	return kafka.NewConsumer(handler, kafka.HandlerSpec{Group: AcceptedConsumerGroup()})

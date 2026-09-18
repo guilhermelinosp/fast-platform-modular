@@ -24,14 +24,14 @@ func (f *fakeRepository) Match(context.Context, string) (Offer, error) {
 }
 
 func TestServiceMatch(t *testing.T) {
-	repo := &fakeRepository{offer: Offer{RideID: "00000000-0000-0000-0000-000000000001", DriverID: "00000000-0000-0000-0000-000000000002", Status: "pending"}}
+	repo := &fakeRepository{offer: Offer{OrderID: "00000000-0000-0000-0000-000000000001", DriverID: "00000000-0000-0000-0000-000000000002", Status: "pending"}}
 	service := NewService(nil, repo)
 
 	out, err := service.Match(context.Background(), "00000000-0000-0000-0000-000000000001")
 	if err != nil {
 		t.Fatalf("Match() error = %v", err)
 	}
-	if out.RideID != repo.offer.RideID || out.DriverID != repo.offer.DriverID || out.Status != "pending" {
+	if out.OrderID != repo.offer.OrderID || out.DriverID != repo.offer.DriverID || out.Status != "pending" {
 		t.Fatalf("output = %+v, want %+v", out, repo.offer)
 	}
 }

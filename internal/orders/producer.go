@@ -1,9 +1,9 @@
-package rides
+package orders
 
 // requestedProducer and acceptedProducer are the Kafka producer ports. The
 // concrete *kafka.Producer types satisfy them; tests inject fakes.
-type requestedProducer interface{ Publish(Requested) error }
-type acceptedProducer interface{ Publish(Accepted) error }
+type requestedProducer interface{ Publish(OrderRequested) error }
+type acceptedProducer interface{ Publish(OrderAccepted) error }
 
 // Publisher publishes rider events to Kafka.
 type Publisher struct {
@@ -16,12 +16,12 @@ func NewPublisher(requested requestedProducer, accepted acceptedProducer) *Publi
 	return &Publisher{requested: requested, accepted: accepted}
 }
 
-// Requested publishes a ride requested event.
-func (p *Publisher) Requested(event Requested) error {
+// OrderRequested publishes an order requested event.
+func (p *Publisher) OrderRequested(event OrderRequested) error {
 	return p.requested.Publish(event)
 }
 
-// Accepted publishes a ride accepted event.
-func (p *Publisher) Accepted(event Accepted) error {
+// OrderAccepted publishes an order accepted event.
+func (p *Publisher) OrderAccepted(event OrderAccepted) error {
 	return p.accepted.Publish(event)
 }

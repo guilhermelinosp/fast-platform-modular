@@ -1,4 +1,4 @@
-package rides
+package orders
 
 import (
 	"context"
@@ -14,15 +14,15 @@ import (
 
 type fakeRepository struct {
 	calls int
-	input RequestedInput
-	ride  Ride
+	input OrderRequestedInput
+	order Order
 	err   error
 }
 
-func (f *fakeRepository) Requested(_ context.Context, input RequestedInput) (Ride, error) {
+func (f *fakeRepository) Requested(_ context.Context, input OrderRequestedInput) (Order, error) {
 	f.calls++
 	f.input = input
-	return f.ride, f.err
+	return f.order, f.err
 }
 
 func TestServiceRequestedValidatesRequiredFields(t *testing.T) {
@@ -42,7 +42,7 @@ func TestServiceRequestedValidatesRequiredFields(t *testing.T) {
 			repo := &fakeRepository{}
 			service := NewService(nil, repo)
 
-			_, err := service.Requested(context.Background(), RequestedInput{ID: tt.id, RiderID: tt.riderID})
+			_, err := service.Requested(context.Background(), OrderRequestedInput{ID: tt.id, RiderID: tt.riderID})
 			assertValidation(t, err)
 			if repo.calls != 0 {
 				t.Fatalf("repository calls = %d, want 0", repo.calls)
@@ -52,7 +52,7 @@ func TestServiceRequestedValidatesRequiredFields(t *testing.T) {
 }
 
 func TestServiceRequestedBuildsOutboxPayload(t *testing.T) {
-	input := RequestedInput{
+	input := OrderRequestedInput{
 		ID:                   "00000000-0000-0000-0000-000000000001",
 		RiderID:              "00000000-0000-0000-0000-000000000002",
 		PickupLatitude:       -23.56,
@@ -60,7 +60,7 @@ func TestServiceRequestedBuildsOutboxPayload(t *testing.T) {
 		DestinationLatitude:  -23.55,
 		DestinationLongitude: -46.64,
 	}
-	repo := &fakeRepository{ride: Ride(inputAsRide(input))}
+	repo := &fakeRepository{order: Order(inputAsOrder(input))}
 	service := NewService(nil, repo)
 
 	out, err := service.Requested(context.Background(), input)
@@ -84,11 +84,11 @@ func TestServiceRequestedBuildsOutboxPayload(t *testing.T) {
 	if _, err := uuid.Parse(got.OutboxID); err != nil {
 		t.Errorf("OutboxID %q is not a UUID: %v", got.OutboxID, err)
 	}
-	if got.EventType != (Requested{}).MessageType() {
-		t.Errorf("EventType = %q, want %q", got.EventType, (Requested{}).MessageType())
+	if got.EventType != (OrderRequested{}).MessageType() {
+		t.Errorf("EventType = %q, want %q", got.EventType, (OrderRequested{}).MessageType())
 	}
 
-	var payload Requested
+	var payload OrderRequested
 	if err := json.Unmarshal(got.Payload, &payload); err != nil {
 		t.Fatalf("payload is not valid requested JSON: %v", err)
 	}
@@ -101,8 +101,8 @@ func TestServiceRequestedBuildsOutboxPayload(t *testing.T) {
 	if payload.OccurredAt <= 0 {
 		t.Errorf("payload.OccurredAt = %d, want > 0", payload.OccurredAt)
 	}
-	if payload.RideID != input.ID || payload.RiderID != input.RiderID {
-		t.Errorf("payload ride = (%q, %q), want (%q, %q)", payload.RideID, payload.RiderID, input.ID, input.RiderID)
+	if payload.OrderID != input.ID || payload.RiderID != input.RiderID {
+		t.Errorf("payload ride = (%q, %q), want (%q, %q)", payload.OrderID, payload.RiderID, input.ID, input.RiderID)
 	}
 	if payload.PickupLatitude != input.PickupLatitude || payload.PickupLongitude != input.PickupLongitude ||
 		payload.DestinationLatitude != input.DestinationLatitude || payload.DestinationLongitude != input.DestinationLongitude {
@@ -115,7 +115,7 @@ func TestServiceRequestedBuildsOutboxPayload(t *testing.T) {
 }
 
 func TestServiceRequestedPreservesProvidedIDs(t *testing.T) {
-	input := RequestedInput{
+	input := OrderRequestedInput{
 		ID:              "00000000-0000-0000-0000-000000000001",
 		RiderID:         "00000000-0000-0000-0000-000000000002",
 		StatusHistoryID: "00000000-0000-0000-0000-000000000003",
@@ -137,16 +137,16 @@ func TestServiceRequestedPropagatesRepositoryError(t *testing.T) {
 	repo := &fakeRepository{err: want}
 	service := NewService(nil, repo)
 
-	_, err := service.Requested(context.Background(), RequestedInput{ID: "id-1", RiderID: "rider-1"})
+	_, err := service.Requested(context.Background(), OrderRequestedInput{ID: "id-1", RiderID: "rider-1"})
 	if !errors.Is(err, want) {
 		t.Fatalf("error = %v, want %v", err, want)
 	}
 }
 
-func TestServiceNewServiceDefaultsLogger(t *testing.T) {
+func TestServiceNewServiceDefaultsTelemetry(t *testing.T) {
 	service := NewService(nil, &fakeRepository{})
-	if service.logger == nil {
-		t.Fatal("logger = nil, want slog.Default()")
+	if service.tel == nil {
+		t.Fatal("tel = nil, want telemetry client")
 	}
 }
 
@@ -164,8 +164,8 @@ func assertValidation(t *testing.T, err error) {
 	}
 }
 
-func inputAsRide(input RequestedInput) Ride {
-	return Ride{
+func inputAsOrder(input OrderRequestedInput) Order {
+	return Order{
 		ID: input.ID, RiderID: input.RiderID,
 		PickupLatitude: input.PickupLatitude, PickupLongitude: input.PickupLongitude,
 		DestinationLatitude: input.DestinationLatitude, DestinationLongitude: input.DestinationLongitude,

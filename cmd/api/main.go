@@ -1,7 +1,7 @@
 // Package main bootstraps the API.
 //
 // Deliberately tiny: it only wires explicit dependencies in lifecycle order
-// and owns the shutdown sequence. Every real decision lives inside packages:
+// and owns the shutdown sequence. Every real decision lives in packages:
 //
 //	context → config → telemetry → api adapter → http server → shutdown
 package main
@@ -9,13 +9,14 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/guilhermelinosp/fast-platform-modular/internal/drives"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/drivers"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
 	"github.com/guilhermelinosp/fast-platform-modular/internal/outbox"
-	"github.com/guilhermelinosp/fast-platform-modular/internal/rides"
 	"github.com/guilhermelinosp/fast-platform-modular/internal/sockets"
 	"github.com/guilhermelinosp/hellnet-lib-api/adapter"
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
@@ -25,11 +26,12 @@ import (
 	"github.com/guilhermelinosp/hellnet-lib-database/database"
 	"github.com/guilhermelinosp/hellnet-lib-kafka/kafka"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func main() {
 	if err := run(); err != nil {
-		slog.Error("fatal", slog.Any("error", err))
+		slog.Error("fatal", "error", err)
 		os.Exit(1)
 	}
 }
@@ -48,6 +50,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	defer func() { _ = tel.Shutdown() }()
 
 	db, err := database.New()
 	if err != nil {
@@ -55,60 +58,35 @@ func run() error {
 	}
 	defer func() { _ = db.Close() }()
 
-	requested, err := kafka.NewProducer[rides.Requested]()
+	orderRequested, err := kafka.NewProducer[orders.OrderRequested]()
 	if err != nil {
 		return err
 	}
-	defer func() { _ = requested.Close() }()
+	defer func() { _ = orderRequested.Close() }()
 
-	accepted, err := kafka.NewProducer[rides.Accepted]()
+	orderAccepted, err := kafka.NewProducer[orders.OrderAccepted]()
 	if err != nil {
 		return err
 	}
-	defer func() { _ = accepted.Close() }()
+	defer func() { _ = orderAccepted.Close() }()
 
-	producer := outbox.NewProducer(requested, accepted)
-	listener, err := outbox.NewListener(db, producer)
+	producer := outbox.NewProducer(orderRequested, orderAccepted)
+	listener, err := outbox.NewListener(db, producer, tel)
 	if err != nil {
 		return err
 	}
 	defer listener.Close()
 
-	riderService := rides.NewService(tel.Logger, rides.NewRepository(db))
-	driverService := drives.NewService(tel.Logger, drives.NewRepository(db))
+	riderService := orders.NewService(tel, orders.NewRepository(db))
+	driverService := drivers.NewService(tel, drivers.NewRepository(db))
 
-	rideHandler := rides.NewHandler(riderService)
-	driveHandler := drives.NewHandler(driverService)
+	orderHandler := orders.NewHandler(riderService)
+	driverHandler := drivers.NewHandler(driverService)
 
 	router := adapter.New(cfg, tel.Logger)
 
-	// Mount Socket.IO handler at /socket.io/
-	socketServer := sockets.NewServer()
-	router.Mount("GET", "/socket.io/", socketServer.Handler())
-	router.Mount("POST", "/socket.io/", socketServer.Handler())
-
-	notificationConsumer, err := sockets.NewConsumer(socketServer)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := notificationConsumer.Close(); err != nil {
-			tel.Logger.Warn("notification consumer close failed", slog.Any("error", err))
-		}
-	}()
-
-	acceptedConsumer, err := sockets.NewAcceptedConsumer(socketServer)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := acceptedConsumer.Close(); err != nil {
-			tel.Logger.Warn("accepted consumer close failed", slog.Any("error", err))
-		}
-	}()
-
 	api.RegisterPlatform(router, api.Deps{
-		Routes: append(rideHandler.Routes(), driveHandler.Routes()...),
+		Routes: append(orderHandler.Routes(), driverHandler.Routes()...),
 		Platform: api.PlatformHandlers{
 			Live:   tel.Live(),
 			Ready:  tel.Ready(),
@@ -116,17 +94,48 @@ func run() error {
 		},
 	})
 
-	if notificationConsumer != nil {
-		go func() {
-			if err := notificationConsumer.RunContext(ctx); err != nil && ctx.Err() == nil {
-				tel.Logger.Error("notification consumer stopped", slog.Any("error", err))
-			}
-		}()
-	}
+	// Mount Socket.IO handler at /socket.io/ BEFORE telemetry middleware
+	// (needs http.Hijacker for WebSocket upgrades)
+	socket := sockets.NewServer(tel)
+	mux := http.NewServeMux()
+	mux.Handle("/socket.io/", socket.Handler())
+	// Prometheus metrics endpoint
+	mux.Handle("GET /metrics", tel.MetricsHandler())
+	// telemetry.Middleware adds OpenTelemetry metrics (request count, duration, inflight, etc.)
+	mux.Handle("/", telemetry.Middleware(tel, router))
 
-	srv := server.New(cfg, tel.Logger, telemetry.Middleware(tel, router))
+	orderRequestConsumer, err := sockets.NewOrderRequestConsumer(tel, socket)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := orderRequestConsumer.Close(); err != nil {
+			tel.Log().Warn("order request consumer close failed", "error", err)
+		}
+	}()
+
+	orderAcceptedConsumer, err := sockets.NewOrderAcceptedConsumer(tel, socket)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := orderAcceptedConsumer.Close(); err != nil {
+			tel.Log().Warn("order accepted consumer close failed", "error", err)
+		}
+	}()
+
+	// Start both consumers with Worker for correlated spans/metrics
+	go tel.Worker("socket.consume.order_requested", func(ctx context.Context) error {
+		return orderRequestConsumer.RunContext(ctx)
+	}, attribute.String("consumer", "order-requested"))
+
+	go tel.Worker("socket.consume.order_accepted", func(ctx context.Context) error {
+		return orderAcceptedConsumer.RunContext(ctx)
+	}, attribute.String("consumer", "order-accepted"))
+
+	srv := server.New(cfg, tel.Logger, mux)
 	if err := srv.Run(ctx); err != nil {
-		tel.Logger.Error("runtime error", slog.Any("error", err))
+		tel.Log().Error("runtime error", "error", err)
 		return err
 	}
 	return nil
