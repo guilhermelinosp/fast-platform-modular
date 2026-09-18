@@ -10,16 +10,6 @@ import (
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 )
 
-// ConsumerGroup returns the dedicated group used by the driver BFF.
-func ConsumerGroup() string {
-	return environments.GetString("HELLNET_KAFKA_", "", "DRIVER_BFF_CONSUMER_GROUP", "fast-driver-bff")
-}
-
-// AcceptedConsumerGroup returns the dedicated group used by the accepted BFF consumer.
-func AcceptedConsumerGroup() string {
-	return environments.GetString("HELLNET_KAFKA_", "", "DRIVER_BFF_ACCEPTED_CONSUMER_GROUP", "fast-driver-bff-accepted")
-}
-
 // RequestedEmitter publishes requested orders to connected driver clients.
 type RequestedEmitter interface {
 	EmitRequested(orders.OrderRequested) error
@@ -43,7 +33,7 @@ func NewOrderRequestConsumer(tel telemetry.Client, emitter RequestedEmitter) (*k
 		}
 		return emitter.EmitRequested(event)
 	}
-	return kafka.NewConsumer(handler, kafka.HandlerSpec{Group: ConsumerGroup()})
+	return kafka.NewConsumer(handler, kafka.HandlerSpec{Group: environments.GetString("HELLNET_KAFKA_", "", "SOCKETIO_DRIVER_NOTIFICATIONS_GROUP", "fast-socketio-driver-notifications")})
 }
 
 // NewOrderAcceptedConsumer consumes the order-accepted topic and emits each event to
@@ -59,5 +49,5 @@ func NewOrderAcceptedConsumer(tel telemetry.Client, emitter AcceptedEmitter) (*k
 		}
 		return emitter.EmitAccepted(event)
 	}
-	return kafka.NewConsumer(handler, kafka.HandlerSpec{Group: AcceptedConsumerGroup()})
+	return kafka.NewConsumer(handler, kafka.HandlerSpec{Group: environments.GetString("HELLNET_KAFKA_", "", "SOCKETIO_ORDER_NOTIFICATIONS_GROUP", "fast-socketio-order-notifications")})
 }
