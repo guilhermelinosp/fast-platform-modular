@@ -1,71 +1,73 @@
 package main
 
 import (
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
 	"github.com/gorilla/websocket"
+	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
+	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	}))
+	ops, err := telemetry.New()
+	if err != nil {
+		os.Exit(1)
+	}
+	defer func() { _ = ops.Shutdown() }()
 
 	// Test Driver client (connects to base path, joins /drivers namespace via protocol)
-	logger.Info("=== Testing Driver Client (/socket.io/ -> /drivers namespace) ===")
-	driverConn := connectSocket(logger, "/socket.io/")
-	defer driverConn.Close()
+	ops.Info("=== Testing Driver Client (/socket.io/ -> /drivers namespace) ===")
+	driverConn := connectSocket(ops, "/socket.io/")
+	defer func() { _ = driverConn.Close() }()
 
 	// Join /drivers namespace after connection
-	joinNamespace(logger, driverConn, "/drivers")
+	joinNamespace(ops, driverConn, "/drivers")
 
 	// Test Rider client (connects to base path, joins /orders namespace)
-	logger.Info("=== Testing Rider Client (/socket.io/ -> /orders namespace) ===")
-	riderConn := connectSocket(logger, "/socket.io/")
-	defer riderConn.Close()
+	ops.Info("=== Testing Rider Client (/socket.io/ -> /orders namespace) ===")
+	riderConn := connectSocket(ops, "/socket.io/")
+	defer func() { _ = riderConn.Close() }()
 
 	// Join /orders namespace
-	joinNamespace(logger, riderConn, "/orders")
+	joinNamespace(ops, riderConn, "/orders")
 
 	// Subscribe to an order room
 	orderID := "test-order-123"
-	logger.Info("Subscribing to order", "order_id", orderID)
+	ops.Info("Subscribing to order", "order_id", orderID)
 	subscribeMsg := `42["order.subscribe","test-order-123"]`
 	if err := riderConn.WriteMessage(websocket.TextMessage, []byte(subscribeMsg)); err != nil {
-		logger.Error("Failed to send subscribe", "error", err)
+		ops.Error("Failed to send subscribe", "error", err)
 	} else {
-		logger.Info("Subscribed to order", "order_id", orderID)
+		ops.Info("Subscribed to order", "order_id", orderID)
 	}
 
 	// Keep running to receive events
-	logger.Info("Waiting for events... (Ctrl+C to exit)")
+	ops.Info("Waiting for events... (Ctrl+C to exit)")
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 
-	logger.Info("Shutting down...")
+	ops.Info("Shutting down...")
 	time.Sleep(1 * time.Second)
 }
 
-func connectSocket(logger *slog.Logger, path string) *websocket.Conn {
+func connectSocket(ops *telemetry.Telemetry, path string) *websocket.Conn {
 	baseURL := environments.GetString("HELLNET_", "", "SOCKET_URL", "ws://localhost:8080")
 	url := baseURL + path + "?EIO=4&transport=websocket"
-	logger.Info("Connecting to WebSocket", "url", url)
+	ops.Info("Connecting to WebSocket", "url", url)
 
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
-		logger.Error("Failed to connect", "path", path, "error", err)
+		ops.Error("Failed to connect", "path", path, "error", err)
 		os.Exit(1)
 	}
 
-	logger.Info("Connected", "path", path)
+	ops.Info("Connected", "path", path)
 
 	// Handle Engine.IO handshake (first message should be "0" - open)
 	go func() {
@@ -73,22 +75,22 @@ func connectSocket(logger *slog.Logger, path string) *websocket.Conn {
 			_, msg, err := conn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					logger.Error("Read error", "error", err)
+					ops.Error("Read error", "error", err)
 				}
 				return
 			}
-			logger.Info("Received message", "message", string(msg))
+			ops.Info("Received message", "message", string(msg))
 		}
 	}()
 
 	return conn
 }
 
-func joinNamespace(logger *slog.Logger, conn *websocket.Conn, namespace string) {
+func joinNamespace(ops *telemetry.Telemetry, conn *websocket.Conn, namespace string) {
 	// Send Socket.IO namespace join packet: 40<namespace>
 	msg := "40" + namespace
-	logger.Info("Joining namespace", "namespace", namespace)
+	ops.Info("Joining namespace", "namespace", namespace)
 	if err := conn.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
-		logger.Error("Failed to join namespace", "namespace", namespace, "error", err)
+		ops.Error("Failed to join namespace", "namespace", namespace, "error", err)
 	}
 }

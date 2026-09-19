@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"testing"
-
 	"uuid"
 
 	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
@@ -25,7 +24,7 @@ func (f *fakeRepository) Match(context.Context, string) (Offer, error) {
 
 func TestServiceMatch(t *testing.T) {
 	repo := &fakeRepository{offer: Offer{OrderID: "00000000-0000-0000-0000-000000000001", DriverID: "00000000-0000-0000-0000-000000000002", Status: "pending"}}
-	service := NewService(nil, repo)
+	service := NewService(repo)
 
 	out, err := service.Match(context.Background(), "00000000-0000-0000-0000-000000000001")
 	if err != nil {
@@ -37,7 +36,7 @@ func TestServiceMatch(t *testing.T) {
 }
 
 func TestServiceMatchRejectsNonUUID(t *testing.T) {
-	service := NewService(nil, &fakeRepository{})
+	service := NewService(&fakeRepository{})
 
 	_, err := service.Match(context.Background(), "not-a-uuid")
 	if err == nil {
@@ -54,7 +53,7 @@ func TestServiceMatchRejectsNonUUID(t *testing.T) {
 
 func TestServiceMatchPropagatesRepositoryError(t *testing.T) {
 	wantErr := errors.New("db down")
-	service := NewService(nil, &fakeRepository{err: wantErr})
+	service := NewService(&fakeRepository{err: wantErr})
 
 	_, err := service.Match(context.Background(), "00000000-0000-0000-0000-000000000001")
 	if !errors.Is(err, wantErr) {
@@ -63,18 +62,21 @@ func TestServiceMatchPropagatesRepositoryError(t *testing.T) {
 }
 
 func TestServiceMatchPropagatesNoDriver(t *testing.T) {
-	service := NewService(nil, &fakeRepository{err: ErrNoDriverAvailable})
+	wantErr := apierrors.New(http.StatusServiceUnavailable, "NO_DRIVER_AVAILABLE", "matching: no driver available")
+	service := NewService(&fakeRepository{err: wantErr})
 
 	_, err := service.Match(context.Background(), "00000000-0000-0000-0000-000000000001")
-	if !errors.Is(err, ErrNoDriverAvailable) {
-		t.Fatalf("error = %v, want ErrNoDriverAvailable", err)
+	var apiErr *apierrors.Error
+	if !errors.As(err, &apiErr) || apiErr.Code != "NO_DRIVER_AVAILABLE" {
+		t.Fatalf("error = %v, want NO_DRIVER_AVAILABLE", err)
 	}
 }
 
-func TestNewServiceDefaultsLogger(t *testing.T) {
-	service := NewService(nil, &fakeRepository{})
-	if service.logger == nil {
-		t.Fatal("logger = nil, want default")
+func TestNewServiceStoresRepository(t *testing.T) {
+	repo := &fakeRepository{}
+	service := NewService(repo)
+	if service.repository != repo {
+		t.Fatal("repository = nil or mismatch, want stored repository")
 	}
 }
 

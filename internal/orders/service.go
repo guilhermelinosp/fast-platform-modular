@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"strings"
 	"time"
+	"uuid"
 
 	"github.com/guilhermelinosp/hellnet-lib-api/errors"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-
-	"github.com/google/uuid"
 )
 
 // Service implements rider use cases.

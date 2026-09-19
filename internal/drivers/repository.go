@@ -2,8 +2,8 @@ package drivers
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/guilhermelinosp/hellnet-lib-api/errors"
 	"github.com/guilhermelinosp/hellnet-lib-database/database"
 )
 
@@ -69,7 +69,7 @@ func (r *Database) Accepted(ctx context.Context, input AcceptedInput) (Order, er
 			return err
 		}
 		if rows == 0 {
-			return fmt.Errorf("%w: %s", ErrDriverNotFound, input.DriverID)
+			return errors.New(404, "DRIVER_NOT_FOUND", "driver does not exist")
 		}
 
 		rows, err = execute("INSERT INTO order_status_history (id, order_id, sequence, status_id) SELECT $1::uuid, $2::uuid, COALESCE((SELECT MAX(sequence) FROM order_status_history WHERE order_id = $2::uuid), 0) + 1, 3 WHERE EXISTS (SELECT 1 FROM order_status_history WHERE order_id = $2::uuid AND status_id = 1) AND NOT EXISTS (SELECT 1 FROM order_status_history WHERE order_id = $2::uuid AND status_id = 3)", input.StatusHistoryID, input.OrderID)
@@ -77,7 +77,7 @@ func (r *Database) Accepted(ctx context.Context, input AcceptedInput) (Order, er
 			return err
 		}
 		if rows == 0 {
-			return fmt.Errorf("%w: %s", ErrOrderNotAcceptable, input.OrderID)
+			return errors.New(409, "ORDER_NOT_ACCEPTABLE", "order is not in the requested state")
 		}
 
 		if _, err := execute("INSERT INTO outbox_events (id, aggregate_type, aggregate_id, event_type, event_version, payload) VALUES ($1::uuid, 'order', $2::uuid, $4, 1, $3::jsonb)", input.OutboxID, input.OrderID, input.Payload, input.EventType); err != nil {

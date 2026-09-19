@@ -17,26 +17,28 @@ type outboxStore interface {
 	RecordFailure(id string, reason string) error
 }
 
-// dbOutboxStore is the PostgreSQL-backed outboxStore.
-type dbOutboxStore struct{ db *database.DB }
+// Database is the PostgreSQL-backed outboxStore.
+type Database struct{ db *database.DB }
 
-func (s dbOutboxStore) QueryRow(id string) (Event, bool, error) {
+// QueryRow returns a single pending outbox event by id.
+func (s Database) QueryRow(id string) (Event, bool, error) {
 	return database.QueryRow[Event](s.db, `SELECT id, event_type, event_version, payload FROM outbox_events WHERE id = $1`, id)
 }
 
-func (s dbOutboxStore) QueryPending() ([]Event, error) {
+// QueryPending returns events not yet published.
+func (s Database) QueryPending() ([]Event, error) {
 	return database.Query[Event](s.db, `SELECT id, event_type, event_version, payload FROM outbox_events WHERE published_at IS NULL ORDER BY occurred_at LIMIT 100`)
 }
 
-func (s dbOutboxStore) RecordPublished(id string) error {
-	_, err := s.db.Execute(`INSERT INTO outbox_publications (id, event_id, published_at)
-SELECT gen_random_uuid(), $1, now() WHERE NOT EXISTS (SELECT 1 FROM outbox_publications WHERE event_id = $1)`, id)
+// RecordPublished audits a successfully published event.
+func (s Database) RecordPublished(id string) error {
+	_, err := s.db.Execute(`INSERT INTO outbox_publications (id, event_id, published_at) SELECT gen_random_uuid(), $1, now() WHERE NOT EXISTS (SELECT 1 FROM outbox_publications WHERE event_id = $1)`, id)
 	return err
 }
 
-func (s dbOutboxStore) RecordFailure(id string, reason string) error {
-	_, err := s.db.Execute(`INSERT INTO outbox_publication_failures (id, event_id, error, failed_at)
-VALUES (gen_random_uuid(), $1, $2, now())`, id, reason)
+// RecordFailure audits a failed event publication.
+func (s Database) RecordFailure(id string, reason string) error {
+	_, err := s.db.Execute(`INSERT INTO outbox_publication_failures (id, event_id, error, failed_at) VALUES (gen_random_uuid(), $1, $2, now())`, id, reason)
 	return err
 }
 
@@ -119,22 +121,22 @@ type Listener struct {
 	workers      sync.WaitGroup
 	closeOnce    sync.Once
 	memo         *outboxMemo
-	tel          telemetry.Client
+	ops          telemetry.Client
 }
 
 // NewListener starts a PostgreSQL listener for outbox events.
-func NewListener(db *database.DB, publisher eventPublisher, tel telemetry.Client) (*Listener, error) {
+func NewListener(tel telemetry.Client, db *database.DB, publisher eventPublisher) (*Listener, error) {
 	conn, err := db.Acquire()
 	if err != nil {
 		return nil, err
 	}
 	l := &Listener{
-		store:        dbOutboxStore{db: db},
+		store:        Database{db: db},
 		publisher:    publisher,
 		listenerConn: conn,
 		stopScan:     make(chan struct{}),
 		memo:         newOutboxMemo(),
-		tel:          tel,
+		ops:          tel,
 	}
 	stop, err := conn.ListenWithReconnect(outboxChannel, l.onNotification, database.ListenOptions{})
 	if err != nil {
@@ -155,7 +157,7 @@ func (l *Listener) onNotification(id string) {
 		event, found, err := l.store.QueryRow(id)
 		if err != nil {
 			l.memo.release(id)
-			l.logError("outbox select failed", "error", err, "event_id", id)
+			l.ops.Error("outbox select failed", "error", err, "event_id", id)
 			l.incrementCounter("outbox.select.errors.total")
 			return
 		}
@@ -165,30 +167,24 @@ func (l *Listener) onNotification(id string) {
 		}
 		if err := l.publisher.Publish(event); err != nil {
 			if auditErr := l.store.RecordFailure(id, err.Error()); auditErr != nil {
-				l.logError("outbox failure audit insert failed", "error", auditErr, "event_id", id)
+				l.ops.Error("outbox failure audit insert failed", "error", auditErr, "event_id", id)
 			}
 			l.memo.release(id)
-			l.logError("outbox publish failed; will retry on next reconcile", "error", err, "event_id", id)
+			l.ops.Error("outbox publish failed; will retry on next reconcile", "error", err, "event_id", id)
 			l.incrementCounter("outbox.publish.errors.total")
 			return
 		}
 		if auditErr := l.store.RecordPublished(id); auditErr != nil {
-			l.logError("outbox publication audit insert failed", "error", auditErr, "event_id", id)
+			l.ops.Error("outbox publication audit insert failed", "error", auditErr, "event_id", id)
 		}
 		l.memo.settle(id)
 		l.incrementCounter("outbox.events.published.total")
 	})
 }
 
-func (l *Listener) logError(msg string, args ...any) {
-	if l.tel != nil {
-		l.tel.Log().Error(msg, args...)
-	}
-}
-
 func (l *Listener) incrementCounter(name string) {
-	if l.tel != nil {
-		if c, err := l.tel.Metric().Counter(name); err == nil {
+	if l.ops != nil {
+		if c, err := l.ops.Metric().Counter(name); err == nil {
 			c.Add(context.Background(), 1)
 		}
 	}
@@ -211,7 +207,7 @@ func (l *Listener) reconcileLoop() {
 func (l *Listener) reconcileOnce() {
 	events, err := l.store.QueryPending()
 	if err != nil {
-		l.logError("outbox reconciliation failed", "error", err)
+		l.ops.Error("outbox reconciliation failed", "error", err)
 		l.incrementCounter("outbox.reconcile.errors.total")
 		return
 	}
@@ -221,15 +217,15 @@ func (l *Listener) reconcileOnce() {
 		}
 		if err := l.publisher.Publish(event); err != nil {
 			if auditErr := l.store.RecordFailure(event.ID, err.Error()); auditErr != nil {
-				l.logError("outbox failure audit insert failed", "error", auditErr, "event_id", event.ID)
+				l.ops.Error("outbox failure audit insert failed", "error", auditErr, "event_id", event.ID)
 			}
 			l.memo.release(event.ID)
-			l.logError("outbox publish failed; will retry on next reconcile", "error", err, "event_id", event.ID)
+			l.ops.Error("outbox publish failed; will retry on next reconcile", "error", err, "event_id", event.ID)
 			l.incrementCounter("outbox.publish.errors.total")
 			continue
 		}
 		if auditErr := l.store.RecordPublished(event.ID); auditErr != nil {
-			l.logError("outbox publication audit insert failed", "error", auditErr, "event_id", event.ID)
+			l.ops.Error("outbox publication audit insert failed", "error", auditErr, "event_id", event.ID)
 		}
 		l.memo.settle(event.ID)
 		l.incrementCounter("outbox.events.published.total")
@@ -241,8 +237,8 @@ func (l *Listener) Close() {
 	l.closeOnce.Do(func() {
 		if l.stopListen != nil {
 			if err := l.stopListen(); err != nil {
-				if l.tel != nil {
-					l.tel.Log().Warn("stop outbox listener failed", "error", err)
+				if l.ops != nil {
+					l.ops.Warn("stop outbox listener failed", "error", err)
 				}
 			}
 		}
