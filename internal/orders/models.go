@@ -1,7 +1,6 @@
 package orders
 
 import (
-	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
 	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
 )
 
@@ -24,24 +23,15 @@ type OrderRequested struct {
 	DestinationLongitude float64 `json:"destinationLongitude" avro:"destinationLongitude"`
 }
 
-// MessageType returns the order requested event type for Kafka (no error).
-// Satisfies kafka.Message interface.
+// MessageType returns the Kafka topic for ride-requested events.
 func (OrderRequested) MessageType() string {
-	topic := environments.GetString("HELLNET_KAFKA_", "", "TOPIC_ORDER_REQUESTED", "")
-	if topic == "" {
-		return "br.com.hellnet.fast.order.requested.v1"
-	}
-	return topic
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_REQUESTED")
 }
 
-// MessageTypeE returns the order requested event type with error.
-// Returns error if HELLNET_KAFKA_TOPIC_ORDER_REQUESTED is not set.
-func (OrderRequested) MessageTypeE() (string, error) {
-	topic := environments.GetString("HELLNET_KAFKA_", "", "TOPIC_ORDER_REQUESTED", "")
-	if topic == "" {
-		return "", apierrors.New(500, "CONFIG_ERROR", "HELLNET_KAFKA_TOPIC_ORDER_REQUESTED not set")
-	}
-	return topic, nil
+// MessageTypeE returns the order requested event type.
+// Panics if HELLNET_KAFKA_TOPIC_ORDER_REQUESTED is not set (no default).
+func (OrderRequested) MessageTypeE() string {
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_REQUESTED")
 }
 
 // OrderAccepted is the Kafka event emitted when an order is accepted.
@@ -56,21 +46,13 @@ type OrderAccepted struct {
 // MessageType returns the order accepted event type for Kafka (no error).
 // Satisfies kafka.Message interface.
 func (OrderAccepted) MessageType() string {
-	topic := environments.GetString("HELLNET_KAFKA_", "", "TOPIC_ORDER_ACCEPTED", "")
-	if topic == "" {
-		return "br.com.hellnet.fast.order.accepted.v1"
-	}
-	return topic
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED")
 }
 
-// MessageTypeE returns the order accepted event type with error.
-// Returns error if HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED is not set.
-func (OrderAccepted) MessageTypeE() (string, error) {
-	topic := environments.GetString("HELLNET_KAFKA_", "", "TOPIC_ORDER_ACCEPTED", "")
-	if topic == "" {
-		return "", apierrors.New(500, "CONFIG_ERROR", "HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED not set")
-	}
-	return topic, nil
+// MessageTypeE returns the order accepted event type.
+// Panics if HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED is not set (no default).
+func (OrderAccepted) MessageTypeE() string {
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED")
 }
 
 // OrderRequestedInput contains data needed to request an order.

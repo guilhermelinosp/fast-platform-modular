@@ -94,12 +94,12 @@ remote logs, metrics, traces, and profiling without changing application code.
                           ▼
                        Service
                   ┌──────┴──────┐
-             RepositoryImp     External API           ← wire tel.HealthRegister /
-                                                 tel.HTTPClient when added
+             RepositoryImp     External API           ← wire ops.HealthRegister /
+                                                 ops.HTTPClient when added
 
 Observability:  API ─► gin middleware ─► hellnet-lib-telemetry ─► Logs │ Metrics │ Traces
 Lifecycle:      context ─► config ─► telemetry.New ─► deps ─► server
-                        ⇄ signal ─► server.Shutdown ─► tel.Shutdown
+                        ⇄ signal ─► server.Shutdown ─► ops.Shutdown
 ```
 
 ### Why this layering pays off
@@ -209,17 +209,17 @@ also carry `event_id` when present. HTTP 2xx succeeds; network errors, 408,
 Everything below exists because the library does it natively:
 
 * **Logging** — one structured logger: JSON to stdout *and* OTLP, correlated
-  with `trace_id`. Inject `tel.Logger` into application dependencies.
+  with `trace_id`. Inject `ops.Logger` into application dependencies.
   Do **not** add zap/zerolog/logrus.
 * **Metrics** — HTTP instrumentation happens once around the whole router
-  (`telemetry.Middleware(tel, handler)`): requests/duration/inflight/
+  (`telemetry.Middleware(ops, handler)`): requests/duration/inflight/
   response+body size/error totals plus runtime (GC, memory, goroutines).
   `GET /metrics` serves Prometheus format from the same registry used for OTLP.
 * **Tracing** — inbound spans extracted by the same middleware. For business
   operations that actually deserve a span:
 
 ```go
-err := tel.WithSpan("orders.process", func(ctx context.Context) error {
+err := ops.WithSpan("riders.process", func(ctx context.Context) error {
     return s.repo.Requested(ctx, order)
 })
 ```
@@ -335,8 +335,8 @@ single static binary. Dev tools are absent from the runtime image by design.
 ### Adding an endpoint (the whole ceremony)
 
 ```go
-// internal/orders/handler.go
-package orders
+// internal/riders/handler.go
+package riders
 
 import (
     "context"
@@ -362,8 +362,8 @@ func (h *Handler) request(ctx context.Context, req api.Requested) (api.Response,
 // Route declarations (path wildcards use web syntax):
 func (h *Handler) Routes() []api.Route {
     return []api.Route{
-        {Method: api.MethodPost, Path: "/orders", Handler: api.HandlerFunc(h.request)},
-        {Method: api.MethodGet, Path: "/orders/{id}", Handler: api.HandlerFunc(h.get)},
+        {Method: api.MethodPost, Path: "/riders", Handler: api.HandlerFunc(h.request)},
+        {Method: api.MethodGet, Path: "/riders/{id}", Handler: api.HandlerFunc(h.get)},
     }
 }
 ```
@@ -371,7 +371,7 @@ func (h *Handler) Routes() []api.Route {
 Wire it — three lines in `cmd/api/main.go`:
 
 ```go
-ordersHandler := orders.NewHandler(orders.NewService(repo))
+ordersHandler := riders.NewHandler(riders.NewService(repo))
 depsRoutes := append(helloHandler.Routes(), ordersHandler.Routes()...)
 api.RegisterPlatform(router, info, api.Deps{Routes: depsRoutes})
 ```
@@ -387,12 +387,12 @@ with the library; readiness reflects them immediately:
 
 ```go
 // cmd/api/main.go, after opening your dependency
-tel.HealthRegister("postgres", func(ctx context.Context) error {
+ops.HealthRegister("postgres", func(ctx context.Context) error {
     return sqlDB.PingContext(ctx) // readiness flips 503 automatically if down
 })
 
 // Outbound HTTP gets tracing/metrics for free by borrowing the lib client:
-client := tel.HTTPClient(&http.Client{Timeout: 5 * time.Second})
+client := ops.HTTPClient(&http.Client{Timeout: 5 * time.Second})
 ```
 
 Notes worth knowing:

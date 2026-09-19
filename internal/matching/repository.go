@@ -2,42 +2,15 @@ package matching
 
 import (
 	"context"
-	"errors"
 
+	"github.com/guilhermelinosp/hellnet-lib-api/errors"
 	"github.com/guilhermelinosp/hellnet-lib-database/database"
 )
-
-// ErrNoDriverAvailable is returned when no driver is currently available.
-var ErrNoDriverAvailable = errors.New("matching: no driver available")
-
-// ErrRideAlreadyMatched is returned when the ride already has an offer.
-var ErrRideAlreadyMatched = errors.New("matching: ride already matched")
 
 // availableDriverRow maps the driver selected by the matching query.
 type availableDriverRow struct {
 	DriverID string `db:"driver_id"`
 }
-
-// selectAvailableDriverSQL picks the driver whose latest availability event is
-// available (append-only resolution: latest event per driver wins). It is a
-// plain SELECT — the database is never mutated by matching.
-const selectAvailableDriverSQL = `
-SELECT e.driver_id
-FROM driver_availability_events e
-LEFT JOIN driver_availability_events newer
-  ON newer.driver_id = e.driver_id AND newer.occurred_at > e.occurred_at
-WHERE e.available AND newer.driver_id IS NULL
-ORDER BY e.occurred_at
-LIMIT 1`
-
-// insertOfferSQL records one offer for an unmatched ride. The INSERT ... SELECT
-// with WHERE NOT EXISTS makes matching idempotent without updating anything:
-// a second attempt for the same ride inserts zero rows and is reported through
-// the affected-rows count.
-const insertOfferSQL = `
-INSERT INTO ride_offers (id, ride_id, driver_id, status, created_at)
-SELECT gen_random_uuid(), $1, $2, 'pending', now()
-WHERE NOT EXISTS (SELECT 1 FROM ride_offers WHERE ride_id = $1)`
 
 // execFn is a single SQL execution inside a transaction. It is the unit the
 // repository depends on, so tests can capture statements without a database.
@@ -53,7 +26,12 @@ type driverFn func() (string, bool, error)
 var transactional = func(db *database.DB, fn func(execute execFn, driver driverFn) error) error {
 	return db.Transactional(func(tx *database.Tx) error {
 		return fn(tx.Execute, func() (string, bool, error) {
-			row, found, err := database.TxQueryRow[availableDriverRow](tx, selectAvailableDriverSQL)
+			row, found, err := database.TxQueryRow[availableDriverRow](tx, `
+SELECT e.driver_id FROM driver_availability_events e
+LEFT JOIN driver_availability_events newer ON newer.driver_id = e.driver_id AND newer.occurred_at > e.occurred_at
+WHERE e.available AND newer.driver_id IS NULL
+ORDER BY e.occurred_at
+LIMIT 1`)
 			if err != nil || !found {
 				return "", found, err
 			}
@@ -80,14 +58,14 @@ func (r *Database) Match(ctx context.Context, orderID string) (Offer, error) {
 			return err
 		}
 		if !found {
-			return ErrNoDriverAvailable
+			return errors.New(503, "NO_DRIVER_AVAILABLE", "matching: no driver available")
 		}
-		n, err := execute(insertOfferSQL, orderID, driverID)
+		n, err := execute(`INSERT INTO ride_offers (id, ride_id, driver_id, status, created_at) SELECT gen_random_uuid(), $1, $2, 'pending', now() WHERE NOT EXISTS (SELECT 1 FROM ride_offers WHERE ride_id = $1)`, orderID, driverID)
 		if err != nil {
 			return err
 		}
 		if n == 0 {
-			return ErrRideAlreadyMatched
+			return errors.New(409, "RIDE_ALREADY_MATCHED", "matching: ride already matched")
 		}
 		offer = Offer{OrderID: orderID, DriverID: driverID, Status: "pending"}
 		return nil

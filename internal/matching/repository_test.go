@@ -3,8 +3,10 @@ package matching
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
+	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
 	"github.com/guilhermelinosp/hellnet-lib-database/database"
 )
 
@@ -64,8 +66,9 @@ func TestRepositoryMatchNoDriver(t *testing.T) {
 	installFakeTx(t, tx)
 
 	_, err := NewRepository(nil).Match(context.Background(), "order-1")
-	if !errors.Is(err, ErrNoDriverAvailable) {
-		t.Fatalf("error = %v, want ErrNoDriverAvailable", err)
+	var apiErr *apierrors.Error
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusServiceUnavailable || apiErr.Code != "NO_DRIVER_AVAILABLE" {
+		t.Fatalf("error = %v, want 503 NO_DRIVER_AVAILABLE", err)
 	}
 	if len(tx.stmts) != 0 {
 		t.Fatalf("statements = %d, want 0 (no insert when no driver)", len(tx.stmts))
@@ -77,8 +80,9 @@ func TestRepositoryMatchAlreadyMatched(t *testing.T) {
 	installFakeTx(t, tx)
 
 	_, err := NewRepository(nil).Match(context.Background(), "order-1")
-	if !errors.Is(err, ErrRideAlreadyMatched) {
-		t.Fatalf("error = %v, want ErrRideAlreadyMatched", err)
+	var apiErr *apierrors.Error
+	if !errors.As(err, &apiErr) || apiErr.Status != http.StatusConflict || apiErr.Code != "RIDE_ALREADY_MATCHED" {
+		t.Fatalf("error = %v, want 409 RIDE_ALREADY_MATCHED", err)
 	}
 }
 

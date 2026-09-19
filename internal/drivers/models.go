@@ -1,7 +1,5 @@
 package drivers
 
-import "errors"
-
 // AvailabilityInput contains the driver availability change request.
 type AvailabilityInput struct {
 	DriverID  string
@@ -34,13 +32,3 @@ type Order struct{ ID string }
 type OrderOutput struct {
 	ID string `json:"id"`
 }
-
-// Domain errors surfaced by the repository. The service maps them to API
-// responses; callers should test with errors.Is.
-var (
-	// ErrDriverNotFound means no matching row exists in drivers.
-	ErrDriverNotFound = errors.New("driver not found")
-	// ErrOrderNotAcceptable means the order is not in the requested state
-	// (missing, already accepted, or in any other terminal state).
-	ErrOrderNotAcceptable = errors.New("order is not in an acceptable state")
-)

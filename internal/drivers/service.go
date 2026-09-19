@@ -3,18 +3,23 @@ package drivers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"time"
+	"uuid"
 
 	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
-	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"
+	"github.com/guilhermelinosp/hellnet-lib-api/errors"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+)
+
+// Sentinel errors for service-level error handling.
+var (
+	ErrDriverNotFound     = errors.New(http.StatusNotFound, "DRIVER_NOT_FOUND", "driver does not exist")
+	ErrOrderNotAcceptable = errors.New(http.StatusConflict, "ORDER_NOT_ACCEPTABLE", "order is not in the requested state")
 )
 
 // Service implements driver use cases.
@@ -84,7 +89,7 @@ func (s *Service) doSetAvailability(ctx context.Context, input AvailabilityInput
 
 	if _, err := uuid.Parse(input.DriverID); err != nil {
 		status = "validation_error"
-		return DriverOutput{}, apierrors.Validation("driver_id", "must be a UUID")
+		return DriverOutput{}, errors.Validation("driver_id", "must be a UUID")
 	}
 	driver, err := s.repository.SetAvailability(ctx, input)
 	if err != nil {
@@ -127,26 +132,31 @@ func (s *Service) doAccepted(ctx context.Context, input AcceptedInput) (OrderOut
 
 	if _, err := uuid.Parse(input.OrderID); err != nil {
 		status = "validation_error"
-		return OrderOutput{}, apierrors.Validation("order_id", "must be a UUID")
+		return OrderOutput{}, errors.Validation("order_id", "must be a UUID")
 	}
 	if _, err := uuid.Parse(input.DriverID); err != nil {
 		status = "validation_error"
-		return OrderOutput{}, apierrors.Validation("driver_id", "must be a UUID")
+		return OrderOutput{}, errors.Validation("driver_id", "must be a UUID")
 	}
 	input.Payload, _ = json.Marshal(orders.OrderAccepted{EventID: input.OutboxID, EventVersion: 1, OccurredAt: time.Now().UnixMilli(), OrderID: input.OrderID, DriverID: input.DriverID})
 	input.EventType = (orders.OrderAccepted{}).MessageType()
 	order, err := s.repository.Accepted(ctx, input)
 	if err != nil {
 		status = "error"
-		if errors.Is(err, ErrDriverNotFound) {
-			return OrderOutput{}, apierrors.New(http.StatusNotFound, "DRIVER_NOT_FOUND", "driver does not exist")
-		}
-		if errors.Is(err, ErrOrderNotAcceptable) {
-			return OrderOutput{}, apierrors.New(http.StatusConflict, "ORDER_NOT_ACCEPTABLE", "order is not in the requested state")
+		// Check if error is from our errors package by type assertion
+		if err != nil {
+			if e, ok := err.(*errors.Error); ok {
+				if e.Code == "DRIVER_NOT_FOUND" {
+					return OrderOutput{}, ErrDriverNotFound
+				}
+				if e.Code == "ORDER_NOT_ACCEPTABLE" {
+					return OrderOutput{}, ErrOrderNotAcceptable
+				}
+			}
 		}
 		pgErr, isPgError := err.(*pgconn.PgError)
 		if isPgError && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_order_acceptances_order" {
-			return OrderOutput{}, apierrors.New(http.StatusConflict, "ORDER_ALREADY_ACCEPTED", "order has already been accepted")
+			return OrderOutput{}, errors.New(http.StatusConflict, "ORDER_ALREADY_ACCEPTED", "order has already been accepted")
 		}
 		return OrderOutput{}, err
 	}

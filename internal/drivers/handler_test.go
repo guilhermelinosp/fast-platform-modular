@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-
 	"uuid"
 
 	"github.com/guilhermelinosp/hellnet-lib-api/api"

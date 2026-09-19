@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"testing"
-
 	"uuid"
 
 	apierrors "github.com/guilhermelinosp/hellnet-lib-api/errors"

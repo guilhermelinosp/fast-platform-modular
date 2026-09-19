@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"testing"
-
 	"uuid"
 
 	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
@@ -64,7 +63,7 @@ func TestServiceSetAvailabilityRejectsNonUUID(t *testing.T) {
 	}
 	var apiErr *apierrors.Error
 	if !errors.As(err, &apiErr) {
-		t.Fatalf("error type = %T, want *errors.Error", err)
+		t.Fatalf("error type = %T, want *apierrors.Error", err)
 	}
 	if apiErr.Status != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", apiErr.Status)
@@ -178,7 +177,7 @@ func TestServiceAcceptedMapsConflictToAlreadyAccepted(t *testing.T) {
 	}
 	var apiErr *apierrors.Error
 	if !errors.As(err, &apiErr) {
-		t.Fatalf("error type = %T, want *errors.Error", err)
+		t.Fatalf("error type = %T, want *apierrors.Error", err)
 	}
 	if apiErr.Status != http.StatusConflict || apiErr.Code != "ORDER_ALREADY_ACCEPTED" {
 		t.Fatalf("error = %+v, want status 409 ORDER_ALREADY_ACCEPTED", apiErr)
@@ -198,7 +197,7 @@ func TestServiceAcceptedMapsDriverNotFound(t *testing.T) {
 	}
 	var apiErr *apierrors.Error
 	if !errors.As(err, &apiErr) {
-		t.Fatalf("error type = %T, want *errors.Error", err)
+		t.Fatalf("error type = %T, want *apierrors.Error", err)
 	}
 	if apiErr.Status != http.StatusNotFound || apiErr.Code != "DRIVER_NOT_FOUND" {
 		t.Fatalf("error = %+v, want status 404 DRIVER_NOT_FOUND", apiErr)
@@ -218,7 +217,7 @@ func TestServiceAcceptedMapsOrderNotAcceptable(t *testing.T) {
 	}
 	var apiErr *apierrors.Error
 	if !errors.As(err, &apiErr) {
-		t.Fatalf("error type = %T, want *errors.Error", err)
+		t.Fatalf("error type = %T, want *apierrors.Error", err)
 	}
 	if apiErr.Status != http.StatusConflict || apiErr.Code != "ORDER_NOT_ACCEPTABLE" {
 		t.Fatalf("error = %+v, want status 409 ORDER_NOT_ACCEPTABLE", apiErr)
@@ -276,7 +275,7 @@ func assertServiceValidation(t *testing.T, err error) {
 	}
 	var apiErr *apierrors.Error
 	if !errors.As(err, &apiErr) {
-		t.Fatalf("error type = %T, want *errors.Error", err)
+		t.Fatalf("error type = %T, want *apierrors.Error", err)
 	}
 	if apiErr.Status != http.StatusBadRequest || apiErr.Code != "VALIDATION_ERROR" {
 		t.Fatalf("error = %+v, want status 400 VALIDATION_ERROR", apiErr)
