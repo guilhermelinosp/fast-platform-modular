@@ -24,7 +24,7 @@ func NewConsumer(ops telemetry.Client, service MatchService) (*kafka.Consumer[or
 	handler := kafka.HandlerFunc[orders.OrderRequested](func(ctx context.Context, event orders.OrderRequested, _ kafka.Ctx) error {
 		return matchEvent(ctx, event, service)
 	})
-	return kafka.NewConsumer(handler, kafka.HandlerSpec{Group: environments.Get("HELLNET_KAFKA_MATCHING_CONSUMER_GROUP")})
+	return kafka.NewConsumer(handler, kafka.HandlerSpec{Group: environments.Get("HELLNET_KAFKA_MATCHING_CONSUMER_GROUP", "fast-matching")})
 }
 
 func matchEvent(ctx context.Context, event orders.OrderRequested, service MatchService) error {

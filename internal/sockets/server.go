@@ -26,8 +26,8 @@ type Server struct {
 // order room with the "order.subscribe" event.
 func NewServer(ops telemetry.Client) *Server {
 	io := socket.NewServer(nil, nil)
-	drivers := io.Of(environments.Get("HELLNET_SOCKET_DRIVERS_NAMESPACE"), nil)
-	riders := io.Of(environments.Get("HELLNET_SOCKET_RIDERS_NAMESPACE"), nil)
+	drivers := io.Of(environments.Get("HELLNET_SOCKET_DRIVERS_NAMESPACE", "/drivers"), nil)
+	riders := io.Of(environments.Get("HELLNET_SOCKET_RIDERS_NAMESPACE", "/riders"), nil)
 
 	_ = riders.On("connection", func(args ...any) {
 		client, ok := args[0].(*socket.Socket)
@@ -55,7 +55,7 @@ func (s *Server) Handler() http.Handler { return s.io.ServeHandler(nil) }
 // EmitRequested broadcasts an order request to connected driver applications.
 func (s *Server) EmitRequested(event orders.OrderRequested) error {
 	if s.ops == nil {
-		return s.drivers.Emit(environments.Get("HELLNET_SOCKET_ORDER_REQUESTED_EVENT"), event)
+		return s.drivers.Emit(environments.Get("HELLNET_SOCKET_ORDER_REQUESTED_EVENT", "order.requested"), event)
 	}
 	return s.ops.WithSpan("socket.emit.order_requested", func(ctx context.Context) error {
 		s.ops.Info("socket.emit.order_requested",
@@ -64,14 +64,14 @@ func (s *Server) EmitRequested(event orders.OrderRequested) error {
 			"event_id", event.EventID,
 			"event_version", event.EventVersion,
 		)
-		return s.drivers.Emit(environments.Get("HELLNET_SOCKET_ORDER_REQUESTED_EVENT"), event)
+		return s.drivers.Emit(environments.Get("HELLNET_SOCKET_ORDER_REQUESTED_EVENT", "order.requested"), event)
 	})
 }
 
 // EmitAccepted sends acceptance to the mobile client subscribed to this order.
 func (s *Server) EmitAccepted(event orders.OrderAccepted) error {
 	if s.ops == nil {
-		return s.riders.To(socket.Room(orderRoom(event.OrderID))).Emit(environments.Get("HELLNET_SOCKET_ORDER_ACCEPTED_EVENT"), event)
+		return s.riders.To(socket.Room(orderRoom(event.OrderID))).Emit(environments.Get("HELLNET_SOCKET_ORDER_ACCEPTED_EVENT", "order.accepted"), event)
 	}
 	return s.ops.WithSpan("socket.emit.order_accepted", func(ctx context.Context) error {
 		s.ops.Info("socket.emit.order_accepted",
@@ -80,7 +80,7 @@ func (s *Server) EmitAccepted(event orders.OrderAccepted) error {
 			"event_id", event.EventID,
 			"event_version", event.EventVersion,
 		)
-		return s.riders.To(socket.Room(orderRoom(event.OrderID))).Emit(environments.Get("HELLNET_SOCKET_ORDER_ACCEPTED_EVENT"), event)
+		return s.riders.To(socket.Room(orderRoom(event.OrderID))).Emit(environments.Get("HELLNET_SOCKET_ORDER_ACCEPTED_EVENT", "order.accepted"), event)
 	})
 }
 

@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/guilhermelinosp/fast-platform-modular/internal/drivers"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/matching"
 	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
 	"github.com/guilhermelinosp/fast-platform-modular/internal/outbox"
 	"github.com/guilhermelinosp/fast-platform-modular/internal/sockets"
@@ -69,6 +70,7 @@ func run() error {
 
 	riderService := orders.NewService(ops, orders.NewRepository(db))
 	driverService := drivers.NewService(ops, drivers.NewRepository(db))
+	matchingService := matching.NewService(matching.NewRepository(db))
 
 	orderHandler := orders.NewHandler(riderService)
 	driverHandler := drivers.NewHandler(driverService)
@@ -114,7 +116,23 @@ func run() error {
 		}
 	}()
 
-	// Start both consumers with Worker for correlated spans/metrics
+	matchingConsumer, err := matching.NewConsumer(ops, matchingService)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := matchingConsumer.Close(); err != nil {
+			ops.Warn("matching consumer close failed", "error", err)
+		}
+	}()
+
+	// Start Kafka consumers with Worker for correlated spans/metrics.
+	go func() {
+		_ = ops.Worker("matching.consume.order_requested", func(ctx context.Context) error {
+			return matchingConsumer.RunContext(ctx)
+		}, attribute.String("consumer", "matching"))
+	}()
+
 	go func() {
 		_ = ops.Worker("socket.consume.order_requested", func(ctx context.Context) error {
 			return orderRequestConsumer.RunContext(ctx)

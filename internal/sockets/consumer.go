@@ -11,10 +11,13 @@ import (
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
 )
 
-var (
-	requestedHandlerSpec = kafka.HandlerSpec{Group: environments.Get("HELLNET_KAFKA_SOCKETIO_DRIVER_NOTIFICATIONS_GROUP")}
-	acceptedHandlerSpec  = kafka.HandlerSpec{Group: environments.Get("HELLNET_KAFKA_SOCKETIO_ORDER_NOTIFICATIONS_GROUP")}
-)
+func requestedHandlerSpec() kafka.HandlerSpec {
+	return kafka.HandlerSpec{Group: environments.Get("HELLNET_KAFKA_SOCKETIO_DRIVER_NOTIFICATIONS_GROUP", "fast-socketio-driver-notifications")}
+}
+
+func acceptedHandlerSpec() kafka.HandlerSpec {
+	return kafka.HandlerSpec{Group: environments.Get("HELLNET_KAFKA_SOCKETIO_ORDER_NOTIFICATIONS_GROUP", "fast-socketio-order-notifications")}
+}
 
 // RequestedEmitter publishes requested riders to connected driver clients.
 type RequestedEmitter interface {
@@ -39,7 +42,7 @@ func NewOrderRequestConsumer(ops telemetry.Client, emitter RequestedEmitter) (*k
 		}
 		return emitter.EmitRequested(event)
 	}
-	return kafka.NewConsumer(handler, requestedHandlerSpec)
+	return kafka.NewConsumer(handler, requestedHandlerSpec())
 }
 
 // NewOrderAcceptedConsumer consumes the order-accepted topic and emits each event to
@@ -55,5 +58,5 @@ func NewOrderAcceptedConsumer(ops telemetry.Client, emitter AcceptedEmitter) (*k
 		}
 		return emitter.EmitAccepted(event)
 	}
-	return kafka.NewConsumer(handler, acceptedHandlerSpec)
+	return kafka.NewConsumer(handler, acceptedHandlerSpec())
 }
