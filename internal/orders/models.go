@@ -23,15 +23,14 @@ type OrderRequested struct {
 	DestinationLongitude float64 `json:"destinationLongitude" avro:"destinationLongitude"`
 }
 
-// MessageType returns the Kafka topic for ride-requested events.
+// MessageType returns the Kafka topic for order-requested events.
 func (OrderRequested) MessageType() string {
-	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_REQUESTED", "fast-order-requested.v1")
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_REQUESTED", "order.requested.v1")
 }
 
-// MessageTypeE returns the order requested event type.
-// Panics if HELLNET_KAFKA_TOPIC_ORDER_REQUESTED is not set (no default).
+// MessageTypeE returns the order-requested event type.
 func (OrderRequested) MessageTypeE() string {
-	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_REQUESTED", "fast-order-requested.v1")
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_REQUESTED", "order.requested.v1")
 }
 
 // OrderAccepted is the Kafka event emitted when an order is accepted.
@@ -46,13 +45,12 @@ type OrderAccepted struct {
 // MessageType returns the order accepted event type for Kafka (no error).
 // Satisfies kafka.Message interface.
 func (OrderAccepted) MessageType() string {
-	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED", "fast-order-accepted.v1")
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED", "order.accepted.v1")
 }
 
-// MessageTypeE returns the order accepted event type.
-// Panics if HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED is not set (no default).
+// MessageTypeE returns the order-accepted event type.
 func (OrderAccepted) MessageTypeE() string {
-	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED", "fast-order-accepted.v1")
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED", "order.accepted.v1")
 }
 
 // OrderRequestedInput contains data needed to request an order.

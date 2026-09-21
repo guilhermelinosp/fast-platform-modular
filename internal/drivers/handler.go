@@ -29,7 +29,7 @@ func NewHandler(service interface {
 // Routes returns driver routes.
 func (h *Handler) Routes() []api.Route {
 	return []api.Route{
-		// {Method: http.MethodPut, Path: "/drivers/{driverId}/availability", Handler: api.HandlerFunc(h.setAvailability)},
+		{Method: http.MethodPut, Path: "/drivers/{driverId}/availability", Handler: api.HandlerFunc(h.setAvailability)},
 		{Method: http.MethodPost, Path: "/orders/{orderId}/accept", Handler: api.HandlerFunc(h.accept)},
 	}
 }

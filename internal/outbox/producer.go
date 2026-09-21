@@ -2,9 +2,9 @@ package outbox
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
+	"github.com/guilhermelinosp/hellnet-lib-api/errors"
 	"github.com/guilhermelinosp/hellnet-lib-kafka/kafka"
 )
 
@@ -36,16 +36,16 @@ func (p *Producer) Publish(event Event) error {
 	case (orders.OrderRequested{}).MessageType():
 		var message orders.OrderRequested
 		if err := json.Unmarshal(event.Payload, &message); err != nil {
-			return fmt.Errorf("decode order requested event: %w", err)
+			return errors.Wrap(errors.New(500, "OUTBOX_DECODE", "decode order requested event"), err)
 		}
 		return p.requested.Publish(message)
 	case (orders.OrderAccepted{}).MessageType():
 		var message orders.OrderAccepted
 		if err := json.Unmarshal(event.Payload, &message); err != nil {
-			return fmt.Errorf("decode order accepted event: %w", err)
+			return errors.Wrap(errors.New(500, "OUTBOX_DECODE", "decode order accepted event"), err)
 		}
 		return p.accepted.Publish(message)
 	default:
-		return fmt.Errorf("unsupported outbox event type %q", event.EventType)
+		return errors.New(500, "UNSUPPORTED_EVENT", "unsupported outbox event type "+event.EventType)
 	}
 }
