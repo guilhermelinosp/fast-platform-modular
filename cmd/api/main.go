@@ -116,7 +116,7 @@ func run() error {
 		}
 	}()
 
-	matchingConsumer, err := matching.NewConsumer(ops, matchingService)
+matchingConsumer, err := matching.NewConsumer(ops, matchingService)
 	if err != nil {
 		return err
 	}
