@@ -1,19 +1,21 @@
-package rides
+package orders
 
-import "os"
+import (
+	"github.com/guilhermelinosp/hellnet-lib-environments/environments"
+)
 
-// Ride is the persisted ride representation returned by the service.
-type Ride struct {
+// Order is the persisted order representation returned by the service.
+type Order struct {
 	ID, RiderID                                                                string
 	PickupLatitude, PickupLongitude, DestinationLatitude, DestinationLongitude float64
 }
 
-// Requested is the Kafka event emitted when a ride is requested.
-type Requested struct {
+// OrderRequested is the Kafka event emitted when an order is requested.
+type OrderRequested struct {
 	EventID              string  `json:"eventId" avro:"eventId"`
 	EventVersion         int     `json:"eventVersion" avro:"eventVersion"`
 	OccurredAt           int64   `json:"occurredAt" avro:"occurredAt"`
-	RideID               string  `json:"rideId" avro:"rideId"`
+	OrderID              string  `json:"orderId" avro:"orderId"`
 	RiderID              string  `json:"riderId" avro:"riderId"`
 	PickupLatitude       float64 `json:"pickupLatitude" avro:"pickupLatitude"`
 	PickupLongitude      float64 `json:"pickupLongitude" avro:"pickupLongitude"`
@@ -21,33 +23,40 @@ type Requested struct {
 	DestinationLongitude float64 `json:"destinationLongitude" avro:"destinationLongitude"`
 }
 
-// MessageType returns the requested event type.
-func (Requested) MessageType() string {
-	if topic := os.Getenv("HELLNET_KAFKA_TOPIC_RIDE_REQUESTED"); topic != "" {
-		return topic
-	}
-	return "fast-ride-requested.v1"
+// MessageType returns the Kafka topic for ride-requested events.
+func (OrderRequested) MessageType() string {
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_REQUESTED", "fast-order-requested.v1")
 }
 
-// Accepted is the Kafka event emitted when a ride is accepted.
-type Accepted struct {
+// MessageTypeE returns the order requested event type.
+// Panics if HELLNET_KAFKA_TOPIC_ORDER_REQUESTED is not set (no default).
+func (OrderRequested) MessageTypeE() string {
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_REQUESTED", "fast-order-requested.v1")
+}
+
+// OrderAccepted is the Kafka event emitted when an order is accepted.
+type OrderAccepted struct {
 	EventID      string `json:"eventId"`
 	EventVersion int    `json:"eventVersion"`
 	OccurredAt   int64  `json:"occurredAt"`
-	RideID       string `json:"rideId"`
+	OrderID      string `json:"orderId"`
 	DriverID     string `json:"driverId"`
 }
 
-// MessageType returns the accepted event type.
-func (Accepted) MessageType() string {
-	if topic := os.Getenv("HELLNET_KAFKA_TOPIC_RIDE_ACCEPTED"); topic != "" {
-		return topic
-	}
-	return "fast-ride-accepted.v1"
+// MessageType returns the order accepted event type for Kafka (no error).
+// Satisfies kafka.Message interface.
+func (OrderAccepted) MessageType() string {
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED", "fast-order-accepted.v1")
 }
 
-// RequestedInput contains data needed to request a ride.
-type RequestedInput struct {
+// MessageTypeE returns the order accepted event type.
+// Panics if HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED is not set (no default).
+func (OrderAccepted) MessageTypeE() string {
+	return environments.Get("HELLNET_KAFKA_TOPIC_ORDER_ACCEPTED", "fast-order-accepted.v1")
+}
+
+// OrderRequestedInput contains data needed to request an order.
+type OrderRequestedInput struct {
 	ID, RiderID                                                                string
 	PickupLatitude, PickupLongitude, DestinationLatitude, DestinationLongitude float64
 	StatusHistoryID, OutboxID                                                  string
@@ -55,8 +64,8 @@ type RequestedInput struct {
 	EventType                                                                  string
 }
 
-// RideOutput is the public ride response.
-type RideOutput struct {
+// OrderOutput is the public order response.
+type OrderOutput struct {
 	ID                   string  `json:"id"`
 	RiderID              string  `json:"rider_id"`
 	PickupLatitude       float64 `json:"pickup_latitude"`

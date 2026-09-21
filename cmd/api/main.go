@@ -1,35 +1,28 @@
-// Package main bootstraps the API.
-//
-// Deliberately tiny: it only wires explicit dependencies in lifecycle order
-// and owns the shutdown sequence. Every real decision lives inside packages:
-//
-//	context → config → telemetry → api adapter → http server → shutdown
 package main
 
 import (
 	"context"
-	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/guilhermelinosp/fast-platform-modular/internal/drives"
-	"github.com/guilhermelinosp/fast-platform-modular/internal/events"
-	"github.com/guilhermelinosp/fast-platform-modular/internal/rides"
-	"github.com/guilhermelinosp/fast-platform-modular/internal/webhooks"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/drivers"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/orders"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/outbox"
+	"github.com/guilhermelinosp/fast-platform-modular/internal/sockets"
 	"github.com/guilhermelinosp/hellnet-lib-api/adapter"
 	"github.com/guilhermelinosp/hellnet-lib-api/api"
 	"github.com/guilhermelinosp/hellnet-lib-api/config"
 	"github.com/guilhermelinosp/hellnet-lib-api/server"
-
 	"github.com/guilhermelinosp/hellnet-lib-database/database"
 	"github.com/guilhermelinosp/hellnet-lib-kafka/kafka"
 	"github.com/guilhermelinosp/hellnet-lib-telemetry/telemetry"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 func main() {
 	if err := run(); err != nil {
-		slog.Error("fatal", slog.Any("error", err))
 		os.Exit(1)
 	}
 }
@@ -39,15 +32,15 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// 2. Configuration (HELLNET_*; telemetry envs stay with the library).
 	cfg, err := config.New()
 	if err != nil {
 		return err
 	}
-	tel, err := telemetry.New()
+	ops, err := telemetry.New()
 	if err != nil {
 		return err
 	}
+	defer func() { _ = ops.Shutdown() }()
 
 	db, err := database.New()
 	if err != nil {
@@ -55,69 +48,87 @@ func run() error {
 	}
 	defer func() { _ = db.Close() }()
 
-	requested, err := kafka.NewProducer[rides.Requested]()
+	orderRequested, err := kafka.NewProducer[orders.OrderRequested]()
 	if err != nil {
 		return err
 	}
-	defer func() { _ = requested.Close() }()
+	defer func() { _ = orderRequested.Close() }()
 
-	accepted, err := kafka.NewProducer[rides.Accepted]()
+	orderAccepted, err := kafka.NewProducer[orders.OrderAccepted]()
 	if err != nil {
 		return err
 	}
-	defer func() { _ = accepted.Close() }()
+	defer func() { _ = orderAccepted.Close() }()
 
-	publishers, err := events.NewPublisher(db, requested, accepted)
+	producer := outbox.NewProducer(orderRequested, orderAccepted)
+	listener, err := outbox.NewListener(ops, db, producer)
 	if err != nil {
 		return err
 	}
-	defer publishers.Close()
+	defer listener.Close()
 
-	riderService := rides.NewService(tel.Logger, rides.NewRepository(db))
-	driverService := drives.NewService(tel.Logger, drives.NewRepository(db))
-	notificationDispatcher, err := webhooks.NewDispatcher()
+	riderService := orders.NewService(ops, orders.NewRepository(db))
+	driverService := drivers.NewService(ops, drivers.NewRepository(db))
 
-	if err != nil {
-		return err
-	}
-	var notificationConsumer *kafka.Consumer[rides.Requested]
-	if notificationDispatcher != nil {
-		notificationConsumer, err = webhooks.NewConsumer(notificationDispatcher)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			if err := notificationConsumer.Close(); err != nil {
-				tel.Logger.Warn("notification consumer close failed", slog.Any("error", err))
-			}
-		}()
-	}
+	orderHandler := orders.NewHandler(riderService)
+	driverHandler := drivers.NewHandler(driverService)
 
-	rideHandler := rides.NewHandler(riderService)
-	driveHandler := drives.NewHandler(driverService)
-
-	router := adapter.New(cfg, tel.Logger)
+	router := adapter.New(cfg, ops)
 
 	api.RegisterPlatform(router, api.Deps{
-		Routes: append(rideHandler.Routes(), driveHandler.Routes()...),
+		Routes: append(orderHandler.Routes(), driverHandler.Routes()...),
 		Platform: api.PlatformHandlers{
-			Live:   tel.Live(),
-			Ready:  tel.Ready(),
-			Health: tel.Health(),
+			Live:   ops.Live(),
+			Ready:  ops.Ready(),
+			Health: ops.Health(),
 		},
 	})
 
-	if notificationConsumer != nil {
-		go func() {
-			if err := notificationConsumer.RunContext(ctx); err != nil && ctx.Err() == nil {
-				tel.Logger.Error("notification consumer stopped", slog.Any("error", err))
-			}
-		}()
-	}
+	// Mount Socket.IO handler at /socket.io/ BEFORE telemetry middleware
+	// (needs http.Hijacker for WebSocket upgrades)
+	socket := sockets.NewServer(ops)
+	mux := http.NewServeMux()
+	mux.Handle("/socket.io/", socket.Handler())
+	// Prometheus metrics endpoint
+	mux.Handle("GET /metrics", ops.MetricsHandler())
+	// telemetry.Middleware adds OpenTelemetry metrics (request count, duration, inflight, etc.)
+	mux.Handle("/", telemetry.Middleware(ops, router))
 
-	srv := server.New(cfg, tel.Logger, telemetry.Middleware(tel, router))
-	if err := srv.Run(ctx); err != nil {
-		tel.Logger.Error("runtime error", slog.Any("error", err))
+	orderRequestConsumer, err := sockets.NewOrderRequestConsumer(ops, socket)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := orderRequestConsumer.Close(); err != nil {
+			ops.Warn("order request consumer close failed", "error", err)
+		}
+	}()
+
+	orderAcceptedConsumer, err := sockets.NewOrderAcceptedConsumer(ops, socket)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := orderAcceptedConsumer.Close(); err != nil {
+			ops.Warn("order accepted consumer close failed", "error", err)
+		}
+	}()
+
+	// Start both consumers with Worker for correlated spans/metrics
+	go func() {
+		_ = ops.Worker("socket.consume.order_requested", func(ctx context.Context) error {
+			return orderRequestConsumer.RunContext(ctx)
+		}, attribute.String("consumer", "order-requested"))
+	}()
+
+	go func() {
+		_ = ops.Worker("socket.consume.order_accepted", func(ctx context.Context) error {
+			return orderAcceptedConsumer.RunContext(ctx)
+		}, attribute.String("consumer", "order-accepted"))
+	}()
+
+	if err := server.New(cfg, ops, mux).Run(ctx); err != nil {
+		ops.Error("runtime error", "error", err)
 		return err
 	}
 	return nil
