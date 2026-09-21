@@ -64,7 +64,7 @@ func (s *Server) EmitRequested(event orders.OrderRequested) error {
 			"event_id", event.EventID,
 			"event_version", event.EventVersion,
 		)
-return s.drivers.Emit(environments.Get("HELLNET_SOCKET_ORDER_REQUESTED_EVENT", "order.requested"), event)
+		return s.drivers.Emit(environments.Get("HELLNET_SOCKET_ORDER_REQUESTED_EVENT", "order.requested"), event)
 	})
 }
 
@@ -80,7 +80,7 @@ func (s *Server) EmitAccepted(event orders.OrderAccepted) error {
 			"event_id", event.EventID,
 			"event_version", event.EventVersion,
 		)
-return s.riders.To(socket.Room(orderRoom(event.OrderID))).Emit(environments.Get("HELLNET_SOCKET_ORDER_ACCEPTED_EVENT", "order.accepted"), event)
+		return s.riders.To(socket.Room(orderRoom(event.OrderID))).Emit(environments.Get("HELLNET_SOCKET_ORDER_ACCEPTED_EVENT", "order.accepted"), event)
 	})
 }
 
