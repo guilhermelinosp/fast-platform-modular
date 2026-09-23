@@ -43,20 +43,20 @@ type Config struct {
 
 // NewConfig builds runtime configuration from environment variables.
 func NewConfig() (*Config, error) {
-	env := strings.TrimSpace(environments.Get("HELLNET_ENVIRONMENT", "Development"))
+	env := strings.TrimSpace(environments.GetString("", "", "HELLNET_ENVIRONMENT", "Development"))
 	c := &Config{
-		Name:               strings.TrimSpace(environments.Get("HELLNET_SERVICE", "")),
+		Name:               strings.TrimSpace(environments.GetString("", "", "HELLNET_SERVICE", "")),
 		Env:                env,
-		Port:               environments.Get("HELLNET_PORT", "8080"),
-		ShutdownTimeout:    environments.GetDuration("HELLNET_SHUTDOWN_TIMEOUT", "10s"),
-		ReadTimeout:        environments.GetDuration("HELLNET_READ_TIMEOUT", "15s"),
-		WriteTimeout:       environments.GetDuration("HELLNET_WRITE_TIMEOUT", "30s"),
-		IdleTimeout:        environments.GetDuration("HELLNET_IDLE_TIMEOUT", "120s"),
-		ReadHeaderTimeout:  environments.GetDuration("HELLNET_READ_HEADER_TIMEOUT", "10s"),
-		CORSAllowedOrigins: list(environments.Get("HELLNET_CORS_ALLOWED_ORIGINS", "")),
-		BodyLimit:          int64(environments.GetInt("HELLNET_BODY_LIMIT", "1048576")),
+		Port:               environments.GetString("", "", "HELLNET_PORT", "8080"),
+		ShutdownTimeout:    environments.GetDuration("SHUTDOWN_TIMEOUT", "10s"),
+		ReadTimeout:        environments.GetDuration("READ_TIMEOUT", "15s"),
+		WriteTimeout:       environments.GetDuration("WRITE_TIMEOUT", "30s"),
+		IdleTimeout:        environments.GetDuration("IDLE_TIMEOUT", "120s"),
+		ReadHeaderTimeout:  environments.GetDuration("READ_HEADER_TIMEOUT", "10s"),
+		CORSAllowedOrigins: list(environments.GetString("", "", "CORS_ALLOWED_ORIGINS", "")),
+		BodyLimit:          int64(environments.GetInt("BODY_LIMIT", "1048576")),
 		ReleaseMode:        !strings.EqualFold(env, "Development"),
-		TrustedProxies:     list(environments.Get("HELLNET_TRUSTED_PROXIES", "")),
+		TrustedProxies:     list(environments.GetString("", "", "TRUSTED_PROXIES", "")),
 	}
 	if err := c.Validate(); err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("config: timeouts must be positive")
 	}
 	if c.BodyLimit <= 0 {
-		return fmt.Errorf("config: HELLNET_BODY_LIMIT must be positive")
+		return fmt.Errorf("config: BODY_LIMIT must be positive")
 	}
 	return nil
 }
